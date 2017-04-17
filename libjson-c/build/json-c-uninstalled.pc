@@ -1,0 +1,11 @@
+prefix=
+exec_prefix=
+libdir=/repo/guoxingp/HD_R5401_China/apps/public/libs/libjson-c/build
+includedir=/repo/guoxingp/HD_R5401_China/apps/public/libs/libjson-c/json-c
+
+Name: json
+Description: JSON implementation in C
+Version: 0.12.99
+Requires:
+Libs:  -L/repo/guoxingp/HD_R5401_China/apps/public/libs/libjson-c/build -ljson-c
+Cflags: -I/repo/guoxingp/HD_R5401_China/apps/public/libs/libjson-c/json-c
