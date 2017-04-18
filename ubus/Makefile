@@ -1,6 +1,4 @@
-TOP_DIR := ../../../..
-include ../../../../makeRule/make.common
-
+TOP_DIR ?= $(shell git rev-parse --show-toplevel)
 .PHONY: install all clean 
 
 JSONC = $(TOP_DIR)/staging_dir/target/root/usr
@@ -15,31 +13,27 @@ UBUS_DEAMON = ubusd
 UBUS_DEAMON_OBJS = ubusd.o ubusd_id.o ubusd_obj.o ubusd_proto.o ubusd_event.o
 
 install: all
-	install -c -m 755 $(UBUS_LIB) $(INSTALL_LIB_DIR)
-	install -c -m 755 $(UBUS_DEAMON) $(INSTALL_SBIN_DIR) 
-	install -c -m 755 $(UBUS_CLI) $(INSTALL_SBIN_DIR) 
+	install -c -m 755 $(UBUS_LIB) $(DESTDIR)/lib
+	install -c -m 755 $(UBUS_DEAMON) $(DESTDIR)/sbin
+	install -c -m 755 $(UBUS_CLI) $(DESTDIR)/sbin
 
 all: $(UBUS_DEAMON) $(UBUS_CLI)
-	install -c -m 755 $(UBUS_LIB) $(INSTALL_LIB_DIR)
-	install -c -m 755 $(UBUS_DEAMON) $(INSTALL_SBIN_DIR) 
-	install -c -m 755 $(UBUS_CLI) $(INSTALL_SBIN_DIR) 
+	install -c -m 755 $(UBUS_LIB) $(DESTDIR)/lib
+	install -c -m 755 $(UBUS_DEAMON) $(DESTDIR)/sbin
+	install -c -m 755 $(UBUS_CLI) $(DESTDIR)/sbin
     
 clean:
 	rm -f *.o $(UBUS_LIB) $(UBUS_DEAMON) $(UBUS_CLI) 
-	rm -f $(INSTALL_LIB_DIR)/$(UBUS_LIB)
-	rm -f $(INSTALL_SBIN_DIR)/$(UBUS_CLI)
-	rm -f $(INSTALL_SBIN_DIR)/$(UBUS_DEAMON)
 
 ALLOWED_INCLUDE_PATHS := -I.  \
-             -I../../include  \
-             -I../../include/linux \
-             -I.. \
+             -I$(JSONC)/include/ \
+             -I$(JSONC)/include/libubox \
              -I$(JSONC)/include/json-c
 
 CFLAGS += -Wall -g  -fPIC $(ALLOWED_INCLUDE_PATHS)
 
 LDFLAGS += -Wl,-allow-shlib-undefined 
-LDFLAGS += -L../libubox -lubox
+LDFLAGS += -L$(DESTDIR)/lib -lubox
 LDFLAGS_CLI = -L$(JSONC)/lib -ljson-c
 LDFLAGS_CLI += -L . -lubus
 
@@ -53,8 +47,3 @@ $(UBUS_DEAMON): $(UBUS_DEAMON_OBJS)
 $(UBUS_CLI): $(UBUS_CLI_OBJS) $(UBUS_LIB)
 	$(CC) -s $(LDFLAGS) $(LDFLAGS_CLI) -o $@ $(UBUS_CLI_OBJS)
 	@echo Compile $(UBUS_CLI) successful
-
-    
-    
-    
-    
