@@ -22,7 +22,7 @@ public class Test {
         if (args.length >= 3) {
             for (int i = 0; i < 20; i++) {
                 Thread newThread = new Thread(mRunner);
-                newThread.setDaemon(true);
+                // newThread.setDaemon(true);
                 newThread.start();
             }
 

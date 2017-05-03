@@ -49,6 +49,7 @@ public class UbusPoller implements Runnable {
             if (doAbort) {
                 UbusJNI.release(native_context);
                 synchronized(this) {
+                    this.isPending = false;
                     this.completed = true;
                     this.notify();
                 }
