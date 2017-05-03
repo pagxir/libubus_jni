@@ -1,26 +1,22 @@
 public class UbusJNI {
-    static Object signal = new Object();
+    static public native void init();
+    static public native void abort();
+    static public native void wakeup();
+    static public native void reply(byte[] native_context);
+    static public native boolean acceptRequest(byte[] native_context);
 
-    static public void wakeupUloop() {
-        signal.notify();
-        return;
+    static public native void release(byte[] native_context);
+    static public native void invoke(int index, byte[] native_context, String object, String method, String params);
+    static public native int fetchReturn(int[] pendingInvokes, int count);
+    static native int getNativeContextSize();
+
+    static public byte[] createContext() {
+        final int NATIVE_CONTEXT_LENGTH = getNativeContextSize();
+        return new byte[NATIVE_CONTEXT_LENGTH];
     }
 
-    static public int fetchReturn(int[] pendingInvokes, int count) {
-
-        try {
-            signal.wait();
-        } catch (InterruptedException e) {
-
-        }
-
-        return 0;
+    static {
+        System.loadLibrary("ubus_jni");
     }
 
-    static public boolean hasPendingRequest() {
-        return false;
-    }
-
-    static public void pullRequest(byte[] native_context) {
-    }
 }

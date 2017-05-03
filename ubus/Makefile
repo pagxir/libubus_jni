@@ -16,11 +16,17 @@ install: all
 	install -c -m 755 $(UBUS_LIB) $(DESTDIR)/lib
 	install -c -m 755 $(UBUS_DEAMON) $(DESTDIR)/sbin
 	install -c -m 755 $(UBUS_CLI) $(DESTDIR)/sbin
+	install -c -m 644 libubus.h  $(DESTDIR)/include
+	install -c -m 644 ubusmsg.h $(DESTDIR)/include
+	install -c -m 644 ubus_common.h $(DESTDIR)/include
 
 all: $(UBUS_DEAMON) $(UBUS_CLI)
 	install -c -m 755 $(UBUS_LIB) $(DESTDIR)/lib
 	install -c -m 755 $(UBUS_DEAMON) $(DESTDIR)/sbin
 	install -c -m 755 $(UBUS_CLI) $(DESTDIR)/sbin
+	install -c -m 644 libubus.h  $(DESTDIR)/include
+	install -c -m 644 ubusmsg.h $(DESTDIR)/include
+	install -c -m 644 ubus_common.h $(DESTDIR)/include
     
 clean:
 	rm -f *.o $(UBUS_LIB) $(UBUS_DEAMON) $(UBUS_CLI) 
