@@ -56,6 +56,12 @@ int ubus_wrap_get_context_size()
     return sizeof(c);
 }
 
+const char *ubus_wrap_get_result(struct ubus_jni_context *_upp)
+{
+    struct ubus_wrap_context *upp = (_upp->wrap);
+    return upp != NULL? upp->result: NULL;
+}
+
 struct ubus_wrap_main_context {
     struct ubus_context *bus_handle;
     struct ubus_event_handler listener;
@@ -163,7 +169,7 @@ int ubus_wrap_invoke(struct ubus_jni_context *_upp, int index, const char *objec
     struct ubus_wrap_context *upp = WRAP_CONTEXT(_upp);
 
     uint32_t id = 0;
-    struct blob_buf msg;
+    struct blob_buf msg = {};
 
     UBUS_WRAP_LOG("index = %d, object %s, method: %s, params: %s\n", index, object, method, params);
 
@@ -182,6 +188,7 @@ int ubus_wrap_invoke(struct ubus_jni_context *_upp, int index, const char *objec
     blob_buf_init(&msg, 0);
     blobmsg_add_json_from_string(&msg, params);
     ret = ubus_invoke_async(ubus->bus_handle, id, method, msg.head, &upp->req);
+    blob_buf_free(&msg);
     if (ret != 0) {
         goto invoke_fail;
     }

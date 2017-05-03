@@ -8,6 +8,7 @@ public class UbusPoller implements Runnable {
         String object;
         String method;
         String params;
+        String result;
         boolean isPending = false;
 
         byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
@@ -21,14 +22,18 @@ public class UbusPoller implements Runnable {
         }
 
         void completeInvoke() {
+            System.out.println("call completeInvoke");
+            byte[] retval = UbusJNI.getResult(native_context);
+            UbusJNI.release(native_context);
+            if (retval != null) {
+                result = new String(retval);
+            }
+
+            isPending = false;
             synchronized(this) {
                 completed = true;
                 this.notify();
             }
-
-            System.out.println("call completeInvoke");
-            UbusJNI.release(native_context);
-            isPending = false;
         }
 
         protected void finalize() {
@@ -118,7 +123,7 @@ public class UbusPoller implements Runnable {
     private Queue<UbusInvoke> mInvokeQueue = new LinkedList<UbusInvoke>();
     private Queue<UbusRequest> mRequestQueue = new LinkedList<UbusRequest>();
 
-    public Object ubusInvoke(String object, String method, String params) {
+    public String ubusInvoke(String object, String method, String params) {
         UbusInvoke invoke = new UbusInvoke();
         invoke.object = object;
         invoke.method = method;
@@ -140,7 +145,7 @@ public class UbusPoller implements Runnable {
 
         }
 
-        return invoke;
+        return invoke.result;
     }
 
     private static final UbusPoller instance = new UbusPoller();

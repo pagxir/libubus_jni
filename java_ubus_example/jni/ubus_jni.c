@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <jni.h>
 
@@ -107,6 +108,28 @@ static jint jni_fetch_return(JNIEnv *env, jclass clazz, jintArray results, jint 
     return count;
 }
 
+static jbyteArray jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
+{
+    size_t len;
+    jbyteArray result;
+    struct ubus_jni_context *upp = HOLD_CONTEXT(context);
+    const char * retval = ubus_wrap_get_result(upp);
+
+    if (retval != NULL) {
+        len = strlen(retval);
+        result = (*env)->NewByteArray(env, len);
+        if (result == NULL) {
+            goto failure; 
+        }
+
+        (*env)->SetByteArrayRegion(env, result, 0, len, retval);
+    }
+
+failure:
+    FREE_CONTEXT(context, upp);
+    return result;
+}
+
 static jint jni_get_context_size(JNIEnv *env, jclass clazz)
 {
     return ubus_wrap_get_context_size();
@@ -129,6 +152,7 @@ static JNINativeMethod methods[] = {
     {"invoke", "(I[BLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", (void *)jni_invoke},
     {"fetchReturn", "([II)I", (void *)jni_fetch_return},
 
+    {"getResult", "([B)[B", jni_get_result},
     {"getNativeContextSize", "()I", (void *)jni_get_context_size},
 };
 
