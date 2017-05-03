@@ -9,22 +9,89 @@ public class UbusPoller implements Runnable {
         String method;
         String params;
         String result;
-        boolean isPending = false;
-
         byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
+
+        int reqIndex = 0;
+        boolean isPending = false;
+        boolean isAborted = false;
+        boolean canAbort  = false;
+
+        boolean queued = false;
         boolean completed = false;
 
-        void nativeInvoke(int index) {
+        boolean nativeInvoke(int index) {
+            boolean doAbort = false;
+            boolean doInvoke = false;
             System.out.println("call nativeInvoke");
-            UbusJNI.invoke(index, native_context, object, method, params);
-            isPending = true;
-            return;
+
+            synchronized(this) {
+                this.queued = false;
+
+                if (!isAborted) {
+                    isPending = true;
+                    doInvoke = true;
+                    canAbort = true;
+                    reqIndex = index;
+                } else if (isPending) {
+                    instance.mPendingInvoke[reqIndex] = null;
+                    doAbort = canAbort;
+                    canAbort = false;
+                } else {
+                    this.completed = true;
+                    this.notify();
+                }
+            }
+
+            if (doInvoke) {
+                UbusJNI.invoke(this.reqIndex, native_context, object, method, params);
+            }
+
+            if (doAbort) {
+                UbusJNI.release(native_context);
+                synchronized(this) {
+                    this.completed = true;
+                    this.notify();
+                }
+            }
+
+            return doInvoke;
+        }
+
+        private boolean enqueue() {
+            if (queued) return true;
+
+            queued = true;
+            synchronized(instance.mInvokeQueue) {
+                instance.mInvokeQueue.add(this);
+                UbusJNI.wakeup();
+            }
+            return false;
+        }
+
+        boolean start() {
+            synchronized(this) {
+                if (isPending) return false;
+                if (isAborted) return false;
+                if (completed) return false;
+                enqueue();
+            }
+            return true;
+        }
+
+        boolean cancel() {
+            synchronized(this) {
+                if (completed) return false;
+                isAborted = true;
+                enqueue();
+            }
+            return true;
         }
 
         void completeInvoke() {
             System.out.println("call completeInvoke");
             byte[] retval = UbusJNI.getResult(native_context);
             UbusJNI.release(native_context);
+
             try {
                 if (retval != null) 
                     result = new String(retval);
@@ -99,8 +166,9 @@ public class UbusPoller implements Runnable {
                     }
 
                     UbusInvoke invoke = mInvokeQueue.remove();
-                    mPendingInvoke[index] = invoke;
-                    invoke.nativeInvoke(index);
+                    if (invoke.nativeInvoke(index)) {
+                        mPendingInvoke[index] = invoke;
+                    }
                 }
             }
 
@@ -109,8 +177,10 @@ public class UbusPoller implements Runnable {
             for (int i = 0; i < count; i++) {
                 index = pendingReturns[i];
                 UbusInvoke ret = mPendingInvoke[index];
-                mPendingInvoke[index] = null;
-                ret.completeInvoke();
+                if (ret != null) {
+                    mPendingInvoke[index] = null;
+                    ret.completeInvoke();
+                }
             }
 
             UbusRequest req = new UbusRequest();
@@ -134,18 +204,22 @@ public class UbusPoller implements Runnable {
         invoke.completed = false;
 
         try {
-            synchronized (mInvokeQueue) {
-                mInvokeQueue.add(invoke);
-                UbusJNI.wakeup();
+
+            invoke.start();
+            synchronized (invoke) {
+                if (!invoke.completed) {
+                    invoke.wait(10000);
+                }
             }
 
+            invoke.cancel();
             synchronized (invoke) {
-                while (!invoke.completed) {
+                while (!invoke.completed || invoke.queued) {
                     invoke.wait();
                 }
             }
         } catch (InterruptedException e) {
-
+            System.out.println(e.toString());
         }
 
         return invoke.result;
