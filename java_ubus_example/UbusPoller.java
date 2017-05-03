@@ -213,9 +213,9 @@ class UbusInvoker extends UbusInvokable implements Runnable {
 
     public void JNIAbort() {
         UbusJNI.release(native_context);
-        completed = true;
         invokable = new UbusCompletedState(this);
         UbusPoller.getInstance().setInvokeSlot(index, null);
+        completed = true;
         notify();
     }
 
@@ -242,6 +242,7 @@ class UbusInvoker extends UbusInvokable implements Runnable {
             invokable.start();
             invokable.waiting(4000);
             invokable.cancel();
+            System.out.println("cancel and wait");
             invokable.waiting();
         }
 
@@ -332,6 +333,7 @@ public class UbusPoller implements Runnable {
             synchronized (mInvokableQueue) {
                 while (!mInvokableQueue.isEmpty()) {
                     UbusInvokable invokable = mInvokableQueue.remove();
+                    invokable.mQueued = false;
                     invokable.run();
                 }
             }
