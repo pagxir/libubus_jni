@@ -1,119 +1,261 @@
 import java.util.Queue;
 import java.util.LinkedList;
 
+class UbusInvokable {
+    boolean mQueued = false;
+    Runnable mRunnable = null;
 
-public class UbusPoller implements Runnable {
+    public UbusInvokable(Runnable _runnable) {
+        mRunnable = _runnable;
+    }
 
-    static class UbusInvoke {
-        String object;
-        String method;
-        String params;
-        String result;
-        byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
+    public void run() {
+        mRunnable.run();
+    }
+}
 
-        int reqIndex = 0;
-        boolean isPending = false;
-        boolean isAborted = false;
-        boolean canAbort  = false;
+interface UbusInvokableState {
+    public void waiting(long millseconds);
+    public void waiting();
+    public void start();
+    public void cancel();
+    public void run();
+}
 
-        boolean queued = false;
-        boolean completed = false;
+class UbusBaseState implements UbusInvokableState {
+    protected UbusInvoker mInvoker = null;
+    protected UbusBaseState(UbusInvoker invoker) {
+        mInvoker = invoker;
+    }
 
-        boolean nativeInvoke(int index) {
-            boolean doAbort = false;
-            boolean doInvoke = false;
-            System.out.println("call nativeInvoke");
+    public void run() { 
+    }
 
-            synchronized(this) {
-                this.queued = false;
+    public void waiting() {
+        mInvoker.invokeWait();
+    }
 
-                if (!isAborted) {
-                    isPending = true;
-                    doInvoke = true;
-                    canAbort = true;
-                    reqIndex = index;
-                } else if (isPending) {
-                    instance.mPendingInvoke[reqIndex] = null;
-                    doAbort = canAbort;
-                    canAbort = false;
-                } else {
-                    this.completed = true;
-                    this.notify();
-                }
-            }
+    public void waiting(long millseconds) {
+        mInvoker.invokeWait(millseconds);
+    }
 
-            if (doInvoke) {
-                UbusJNI.invoke(this.reqIndex, native_context, object, method, params);
-            }
+    public void start() {
+    }
 
-            if (doAbort) {
-                UbusJNI.release(native_context);
-                synchronized(this) {
-                    this.isPending = false;
-                    this.completed = true;
-                    this.notify();
-                }
-            }
+    public void cancel() {
+    }
+}
 
-            return doInvoke;
-        }
+class UbusInitializeState extends UbusBaseState {
 
-        private boolean enqueue() {
-            if (queued) return true;
+    public UbusInitializeState(UbusInvoker invoker) {
+        super(invoker);
+    }
 
-            queued = true;
-            synchronized(instance.mInvokeQueue) {
-                instance.mInvokeQueue.add(this);
-                UbusJNI.wakeup();
-            }
-            return false;
-        }
+    public void run() {
+        throw new IllegalStateException("could not run on initialize state");
+    }
 
-        boolean start() {
-            synchronized(this) {
-                if (isPending) return false;
-                if (isAborted) return false;
-                if (completed) return false;
-                enqueue();
-            }
-            return true;
-        }
+    public void start() {
+        mInvoker.invokeStart();
+        return;
+    }
 
-        boolean cancel() {
-            synchronized(this) {
-                if (completed) return false;
-                isAborted = true;
-                enqueue();
-            }
-            return true;
-        }
+    public void waiting() {
+        throw new IllegalStateException("could not wait on initialize state");
+    }
 
-        void completeInvoke() {
-            System.out.println("call completeInvoke");
-            byte[] retval = UbusJNI.getResult(native_context);
-            UbusJNI.release(native_context);
+    public void waiting(long millseconds) {
+        throw new IllegalStateException("could not wait on initialize state");
+    }
+}
 
-            try {
-                if (retval != null) 
-                    result = new String(retval);
-            } catch (Exception e) {
-                System.out.println(e.toString());
-            }
+class UbusQueuedState extends UbusBaseState {
+    public UbusQueuedState(UbusInvoker invoker) {
+        super(invoker);
+    }
 
-            isPending = false;
-            synchronized(this) {
-                completed = true;
-                this.notify();
-            }
-        }
+    public void run() {
+        mInvoker.invokeNative();
+        return;
+    }
 
-        protected void finalize() {
-            if (isPending) {
-                UbusJNI.abort();
-            }
+    public void cancel() {
+        mInvoker.JavaCancel();
+        return;
+    }
+}
+
+class UbusPendingState extends UbusBaseState {
+    public UbusPendingState(UbusInvoker invoker) {
+        super(invoker);
+    }
+
+    public void cancel() {
+        mInvoker.JNICancel();
+        return;
+    }
+}
+
+class UbusCanceledState extends UbusBaseState {
+    public UbusCanceledState(UbusInvoker invoker) {
+        super(invoker);
+    }
+
+    public void run() {
+        mInvoker.JNIAbort();
+        return;
+    }
+}
+
+class UbusCompletedState extends UbusBaseState {
+    public UbusCompletedState(UbusInvoker invoker) {
+        super(invoker);
+    }
+
+    public void run() {
+        mInvoker.javaAbort();
+        return;
+    }
+
+    public void waiting(long millseconds) {
+        return;
+    }
+
+    public void waiting() {
+        return;
+    }
+}
+
+class UbusInvoker extends UbusInvokable implements Runnable {
+    String object;
+    String method;
+    String params;
+    String result;
+
+    int index;
+    boolean completed;
+    byte[] native_context = UbusJNI.createContext();
+
+    public UbusInvoker() {
+        super(null);
+        mRunnable = this;
+    }
+
+    public void run() {
+        synchronized(this) {
+            invokable.run();
         }
     }
 
+    private String getResult() {
+        byte[] data = UbusJNI.getResult(native_context);
+
+        try {
+            if (data != null)
+                return new String(data);
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
+
+        return null;
+    }
+
+    void completeInvoke() {
+        synchronized(this) {
+            UbusPoller.getInstance().setInvokeSlot(index, null);
+            result = getResult();
+
+            UbusJNI.release(native_context);
+            invokable = new UbusCompletedState(this);
+            completed = true;
+            notify();
+        }
+        return;
+    }
+
+    public void invokeStart() {
+        UbusPoller.getInstance().add(this);
+        invokable = new UbusQueuedState(this);
+    }
+
+    public void invokeWait() {
+        try {
+            if (!completed) wait();
+        } catch (InterruptedException e) {
+            System.out.println(e.toString());
+        }
+    }
+
+    public void invokeWait(long millseconds) {
+        try {
+            if (!completed) wait(millseconds);
+        } catch (InterruptedException e) {
+            System.out.println(e.toString());
+        }
+    }
+
+    public void JavaCancel() {
+        UbusPoller.getInstance().add(this);
+        invokable = new UbusCompletedState(this);
+    }
+
+    public void JNICancel() {
+        UbusPoller.getInstance().add(this);
+        invokable = new UbusCanceledState(this);
+    }
+
+    public void javaAbort() {
+        completed = true;
+        invokable = new UbusCompletedState(this);
+        notify();
+    }
+
+    public void JNIAbort() {
+        UbusJNI.release(native_context);
+        completed = true;
+        invokable = new UbusCompletedState(this);
+        UbusPoller.getInstance().setInvokeSlot(index, null);
+        notify();
+    }
+
+    public void invokeNative() {
+        int _index = UbusPoller.getInstance().findEmptyInvokeSlot();
+
+        if (_index != -1) {
+            UbusJNI.invoke(_index, native_context, object, method, params);
+            UbusPoller.getInstance().setInvokeSlot(_index, this);
+            invokable = new UbusPendingState(this);
+            this.index = _index;
+        } else {
+            invokable = new UbusCompletedState(this);
+            completed = true;
+            notify();
+        }
+    }
+
+    UbusInvokableState invokable = new UbusInitializeState(this);
+
+    void remoteInvoke() {
+
+        synchronized(this) {
+            invokable.start();
+            invokable.waiting(4000);
+            invokable.cancel();
+            invokable.waiting();
+        }
+
+        return;
+    }
+
+    protected void finalize() {
+        synchronized(this) {
+            invokable.cancel();
+        }
+    }
+}
+
+public class UbusPoller implements Runnable {
     static class UbusRequest {
         byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
 
@@ -127,10 +269,24 @@ public class UbusPoller implements Runnable {
         }
     }
 
-    final int MAX_INVOKE = 100;
+    public String ubusInvoke(String object, String method, String params) {
+        UbusInvoker invokable = new UbusInvoker();
+        invokable.object = object;
+        invokable.method = method;
+        invokable.params = params;
+        invokable.completed = false;
+        invokable.remoteInvoke();
+        return invokable.result;
+    }
 
     int mLastIndex = 0;
-    UbusInvoke[] mPendingInvoke = new UbusInvoke[MAX_INVOKE];
+    final int MAX_INVOKE = 100;
+    UbusInvoker[] mPendingInvoke = new UbusInvoker[MAX_INVOKE];
+
+    public void setInvokeSlot(int index, UbusInvoker invoker) {
+        mPendingInvoke[index] = invoker;
+        return;
+    }
 
     public int findEmptyInvokeSlot() {
         int lastIndex;
@@ -153,23 +309,30 @@ public class UbusPoller implements Runnable {
         return -1;
     }
 
+    private Thread mThread = new Thread(this);
+    private Queue<UbusRequest> mRequestQueue = new LinkedList<UbusRequest>();
+    private Queue<UbusInvokable> mInvokableQueue = new LinkedList<UbusInvokable>();
+
+    public void add(UbusInvokable invokable) {
+        synchronized(mInvokableQueue) {
+            if (!invokable.mQueued) {
+                invokable.mQueued = true;
+                mInvokableQueue.add(invokable);
+                UbusJNI.wakeup();
+            }
+        }
+    }
+
     public void run() {
         int index;
         int[] pendingReturns = new int[100];
 
         UbusJNI.init();
         for ( ; ; ) {
-            synchronized (mInvokeQueue) {
-                while (!mInvokeQueue.isEmpty()) {
-                    index = findEmptyInvokeSlot();
-                    if (index == -1) {
-                        break;
-                    }
-
-                    UbusInvoke invoke = mInvokeQueue.remove();
-                    if (invoke.nativeInvoke(index)) {
-                        mPendingInvoke[index] = invoke;
-                    }
+            synchronized (mInvokableQueue) {
+                while (!mInvokableQueue.isEmpty()) {
+                    UbusInvokable invokable = mInvokableQueue.remove();
+                    invokable.run();
                 }
             }
 
@@ -177,7 +340,7 @@ public class UbusPoller implements Runnable {
 
             for (int i = 0; i < count; i++) {
                 index = pendingReturns[i];
-                UbusInvoke ret = mPendingInvoke[index];
+                UbusInvoker ret = mPendingInvoke[index];
                 if (ret != null) {
                     mPendingInvoke[index] = null;
                     ret.completeInvoke();
@@ -193,37 +356,20 @@ public class UbusPoller implements Runnable {
         }
     }
 
-    private Thread mThread = new Thread(this);
-    private Queue<UbusInvoke> mInvokeQueue = new LinkedList<UbusInvoke>();
-    private Queue<UbusRequest> mRequestQueue = new LinkedList<UbusRequest>();
+    private boolean mIsStarted = false;
 
-    public String ubusInvoke(String object, String method, String params) {
-        UbusInvoke invoke = new UbusInvoke();
-        invoke.object = object;
-        invoke.method = method;
-        invoke.params = params;
-        invoke.completed = false;
+    private void start() {
+        boolean oldStarted = true;
 
-        try {
-
-            invoke.start();
-            synchronized (invoke) {
-                if (!invoke.completed) {
-                    invoke.wait(10000);
-                }
-            }
-
-            invoke.cancel();
-            synchronized (invoke) {
-                while (!invoke.completed || invoke.queued) {
-                    invoke.wait();
-                }
-            }
-        } catch (InterruptedException e) {
-            System.out.println(e.toString());
+        synchronized(this) {
+            oldStarted = mIsStarted;
+            mIsStarted = true;
         }
 
-        return invoke.result;
+        if (oldStarted == false) {
+            mThread.setDaemon(true);
+            mThread.start();
+        }
     }
 
     private static final UbusPoller instance = new UbusPoller();
@@ -231,21 +377,6 @@ public class UbusPoller implements Runnable {
     public static UbusPoller getInstance() {
         instance.start();
         return instance;
-    }
-
-    private boolean isStarted = false;
-    public void start() {
-        boolean oldStarted = true;
-
-        synchronized(this) {
-            oldStarted = isStarted;
-            isStarted = true;
-        }
-
-        if (oldStarted == false) {
-            mThread.setDaemon(true);
-            mThread.start();
-        }
     }
 };
 
