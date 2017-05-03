@@ -25,8 +25,11 @@ public class UbusPoller implements Runnable {
             System.out.println("call completeInvoke");
             byte[] retval = UbusJNI.getResult(native_context);
             UbusJNI.release(native_context);
-            if (retval != null) {
-                result = new String(retval);
+            try {
+                if (retval != null) 
+                    result = new String(retval);
+            } catch (Exception e) {
+                System.out.println(e.toString());
             }
 
             isPending = false;

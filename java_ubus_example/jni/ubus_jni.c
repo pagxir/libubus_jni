@@ -111,7 +111,7 @@ static jint jni_fetch_return(JNIEnv *env, jclass clazz, jintArray results, jint 
 static jbyteArray jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
 {
     size_t len;
-    jbyteArray result;
+    jbyteArray result = NULL;
     struct ubus_jni_context *upp = HOLD_CONTEXT(context);
     const char * retval = ubus_wrap_get_result(upp);
 

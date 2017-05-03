@@ -5,10 +5,12 @@ public class Test {
         System.out.println("Hello, World");
 
         if (args.length >= 3) {
-            UbusPoller poller = UbusPoller.getInstance();
-            String result = poller.ubusInvoke(args[0], args[1], args[2]);
-            if (result != null) {
-                System.out.println("Hello, World" + result);
+            for (int i = 0; i < 10000; i ++) {
+                UbusPoller poller = UbusPoller.getInstance();
+                String result = poller.ubusInvoke(args[0], args[1], args[2]);
+                if (result != null) {
+                    System.out.println(result);
+                }
             }
         }
 
