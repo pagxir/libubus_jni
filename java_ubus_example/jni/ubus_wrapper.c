@@ -360,6 +360,7 @@ static struct ubus_object test_object = {
 
 #define MAX_OBJECTS 100
 static int _ubus_nobject = 0;
+static char _ubus_use_bitmap[MAX_OBJECTS];
 static struct ubus_object _ubus_objects[MAX_OBJECTS];
 
 static struct ubus_object_type *ubus_parse_object_type(const void *ptr, size_t len)
@@ -388,12 +389,23 @@ int ubus_wrap_add_object(const char *name, void *upper, size_t len)
     ret = ubus_add_object(main_ctx->bus_handle, object);
     assert(ret == 0);
 
+    _ubus_use_bitmap[index] = 0x1;
     _ubus_nobject++;
     return -1;
 }
 
 int ubus_wrap_remove_object(int object_id)
 {
+    struct ubus_object *object;
+    assert(object_id < _ubus_nobject && object_id >= 0);
+    assert(_ubus_use_bitmap[object_id] == 0x1);
+
+    object = &_ubus_objects[object_id];
+    free(object->name);
+    object->name = NULL;
+    free(object->type);
+    memset(object, 0, sizeof(*object));
+    _ubus_use_bitmap[object_id] = 0;
     return 0;
 }
 
