@@ -18,6 +18,7 @@ struct ubus_wrap_context;
 
 struct ubus_jni_context {
     struct ubus_wrap_context *wrap;
+    struct ubus_incoming_context *req;
 };
 
 #define FLAG_REQ_PENDING 0x8000
@@ -266,13 +267,76 @@ int ubus_wrap_release(struct ubus_jni_context *_upp)
     return 0;
 }
 
+struct ubus_incoming_context {
+    struct list_head entry;
+    struct ubus_request_data req;
+
+    void *msg_data;
+    size_t msg_len;
+    char dummy[1];
+};
+
+static int _accept_incoming = 0;
+LIST_HEAD(_ubus_incoming_reqs);
+
 int ubus_wrap_accept_request(struct ubus_jni_context *upp)
 {
-    return -1;
+    struct list_head *curr, *next;
+    struct ubus_incoming_context *incoming;
+
+    if (list_empty(&_ubus_incoming_reqs)) {
+        return -1;
+    }
+
+    list_for_each_safe(curr, next, &_ubus_incoming_reqs) {
+        incoming = list_entry(curr, struct ubus_incoming_context, entry);
+        upp->req = incoming;
+        _accept_incoming++;
+        list_del(curr);
+        break;
+    }
+
+    return 0;
 }
 
 int ubus_wrap_reply(struct ubus_jni_context *upp)
 {
+    struct ubus_incoming_context *incoming;
+    struct ubus_wrap_main_context *ctx = &_ubus_wrap_main;
+
+    incoming = upp->req;
+    assert(incoming != NULL);
+#if 0
+    blob_buf_init(&b, 0);
+    blobmsg_add_string(&b, "message", req->data);
+    ubus_send_reply(ctx, &req->req, b.head);
+#endif
+    ubus_complete_deferred_request(ctx->bus_handle, &incoming->req, 0);
+    _accept_incoming--;
+    return 0;
+}
+
+static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
+        struct ubus_request_data *req, const char *method,
+        struct blob_attr *msg)
+{
+    size_t len = blob_len(msg);
+    void   *data = blob_data(msg);
+    struct ubus_incoming_context *dreq = NULL;
+    assert(_accept_incoming < 100);
+
+    dreq = calloc(sizeof(*req) + len, 1);
+    if (dreq == NULL) {
+        return UBUS_STATUS_UNKNOWN_ERROR;
+    }
+
+    memcpy(dreq->dummy, data, len);
+    dreq->msg_data = dreq->dummy;
+    dreq->msg_len = len;
+    list_add_tail(&dreq->entry, &_ubus_incoming_reqs);
+
+    ubus_defer_request(ctx, req, &dreq->req);
+    uloop_end();
     return 0;
 }
 
