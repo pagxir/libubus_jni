@@ -340,9 +340,55 @@ static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
     return 0;
 }
 
-int ubus_wrap_add_object(void *upper)
-{
+#if 0
+static const struct ubus_method test_methods[] = {
+    UBUS_METHOD("hello", test_hello, NULL),
+    UBUS_METHOD("watch", test_watch, watch_policy),
+    UBUS_METHOD("count", test_count, count_policy),
+};
 
+static struct ubus_object_type test_object_type =
+    UBUS_OBJECT_TYPE("test", test_methods);
+
+static struct ubus_object test_object = {
+    .name = "test",
+    .type = &test_object_type,
+    .methods = test_methods,
+    .n_methods = ARRAY_SIZE(test_methods),
+};
+#endif
+
+#define MAX_OBJECTS 100
+static int _ubus_nobject = 0;
+static struct ubus_object _ubus_objects[MAX_OBJECTS];
+
+static struct ubus_object_type *ubus_parse_object_type(const void *ptr, size_t len)
+{
+    return NULL;
+}
+
+int ubus_wrap_add_object(const char *name, void *upper, size_t len)
+{
+    int ret;
+    struct ubus_object *object;
+    int index = _ubus_nobject;
+    struct ubus_wrap_main_context *main_ctx = &_ubus_wrap_main;
+
+    ubus_wrap_init();
+    assert(_ubus_nobject + 1 < MAX_OBJECTS);
+    object = &_ubus_objects[index];
+
+    object->type = ubus_parse_object_type(upper, len);
+    assert(object->type != NULL);
+
+    object->name = strdup(name);
+    object->methods = object->type->methods;
+    object->n_methods = object->type->n_methods;
+
+    ret = ubus_add_object(main_ctx->bus_handle, object);
+    assert(ret == 0);
+
+    _ubus_nobject++;
     return -1;
 }
 
@@ -350,3 +396,4 @@ int ubus_wrap_remove_object(int object_id)
 {
     return 0;
 }
+

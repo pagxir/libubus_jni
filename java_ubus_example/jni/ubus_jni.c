@@ -141,13 +141,22 @@ static void jni_abort(JNIEnv *env, jclass clazz)
     return;
 }
 
-static jint jni_add_object(JNIEnv *env, jclass clazz, jbyteArray context)
+static jint jni_add_object(JNIEnv *env, jclass clazz, jstring name, jbyteArray context)
 {
-    struct ubus_jni_context *upp = HOLD_CONTEXT(context);
-    assert(upp != NULL);
-    ubus_wrap_add_object(upp);
-    FREE_CONTEXT(context, upp);
-    return;
+    int object_id;
+    const char *buf_name;
+    size_t data_len = (*env)->GetArrayLength(env, context);
+    jbyte *data = (*env)->GetByteArrayElements(env, context, 0);
+    assert(data != NULL);
+
+    buf_name = (*env)->GetStringUTFChars(env, name, 0);
+    assert(buf_name != NULL);
+
+    object_id = ubus_wrap_add_object(buf_name, data, data_len);
+    (*env)->ReleaseStringUTFChars(env, name, buf_name);
+    (*env)->ReleaseByteArrayElements(env, context, data, JNI_ABORT);
+
+    return object_id;
 }
 
 static void jni_remove_object(JNIEnv *env, jclass clazz, jint object_id)
@@ -170,7 +179,7 @@ static JNINativeMethod methods[] = {
     {"getResult", "([B)[B", jni_get_result},
     {"getNativeContextSize", "()I", (void *)jni_get_context_size},
 
-    {"addObject", "([B)I", (void *)jni_add_object},
+    {"addObject", "(Ljava/lang/String;[B)I", (void *)jni_add_object},
     {"removeObject", "(I)V", (void *)jni_remove_object},
 };
 

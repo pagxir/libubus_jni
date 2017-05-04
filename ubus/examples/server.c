@@ -54,7 +54,7 @@ static void test_hello_fd_reply(struct uloop_timeout *t)
 		return;
 	}
 
-	uloop_timeout_set(&req->timeout, 1000);
+	uloop_timeout_set(&req->timeout, 100);
 }
 
 static void test_hello_reply(struct uloop_timeout *t)
@@ -99,7 +99,7 @@ static int test_hello(struct ubus_context *ctx, struct ubus_object *obj,
 	sprintf(hreq->data, format, obj->name, msgstr);
 	ubus_defer_request(ctx, req, &hreq->req);
 	hreq->timeout.cb = test_hello_reply;
-	uloop_timeout_set(&hreq->timeout, 1000);
+	uloop_timeout_set(&hreq->timeout, 100);
 
 	return 0;
 }
@@ -195,7 +195,13 @@ static int test_count(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 static const struct ubus_method test_methods[] = {
-	UBUS_METHOD("hello", test_hello, hello_policy),
+	UBUS_METHOD("hello", NULL, hello_policy),
+	UBUS_METHOD("watch", NULL, watch_policy),
+	UBUS_METHOD("count", NULL, count_policy),
+};
+
+static const struct ubus_method test_methods0[] = {
+	UBUS_METHOD("hello", test_hello, NULL),
 	UBUS_METHOD("watch", test_watch, watch_policy),
 	UBUS_METHOD("count", test_count, count_policy),
 };
@@ -206,7 +212,7 @@ static struct ubus_object_type test_object_type =
 static struct ubus_object test_object = {
 	.name = "test",
 	.type = &test_object_type,
-	.methods = test_methods,
+	.methods = test_methods0,
 	.n_methods = ARRAY_SIZE(test_methods),
 };
 
