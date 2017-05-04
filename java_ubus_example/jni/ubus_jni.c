@@ -141,6 +141,21 @@ static void jni_abort(JNIEnv *env, jclass clazz)
     return;
 }
 
+static jint jni_add_object(JNIEnv *env, jclass clazz, jbyteArray context)
+{
+    struct ubus_jni_context *upp = HOLD_CONTEXT(context);
+    assert(upp != NULL);
+    ubus_wrap_add_object(upp);
+    FREE_CONTEXT(context, upp);
+    return;
+}
+
+static void jni_remove_object(JNIEnv *env, jclass clazz, jint object_id)
+{
+    ubus_wrap_remove_object(object_id);
+    return;
+}
+
 static JNINativeMethod methods[] = {
     {"init", "()V", (void *)jni_init},
     {"abort", "()V", (void *)jni_abort},
@@ -154,6 +169,9 @@ static JNINativeMethod methods[] = {
 
     {"getResult", "([B)[B", jni_get_result},
     {"getNativeContextSize", "()I", (void *)jni_get_context_size},
+
+    {"addObject", "([B)I", (void *)jni_add_object},
+    {"removeObject", "(I)V", (void *)jni_remove_object},
 };
 
 jint JNI_OnLoad(JavaVM * vm, void * reserved)

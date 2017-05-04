@@ -340,3 +340,13 @@ static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
     return 0;
 }
 
+int ubus_wrap_add_object(void *upper)
+{
+
+    return -1;
+}
+
+int ubus_wrap_remove_object(int object_id)
+{
+    return 0;
+}

@@ -20,11 +20,13 @@ public class Test {
 
         mParams = args;
         if (args.length >= 3) {
+/*
             for (int i = 0; i < 20; i++) {
                 Thread newThread = new Thread(mRunner);
                 // newThread.setDaemon(true);
                 newThread.start();
             }
+*/
 
             for (int i = 0; i < 10000; i ++) {
                 UbusPoller poller = UbusPoller.getInstance();

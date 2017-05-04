@@ -50,9 +50,14 @@ public class UbusType {
 }
 
 class UbusObject {
+    int objId;
+    String name;
     UbusType mType = null;
 
     UbusObject(UbusType type) {
         mType = type;
+    }
+
+    void register() {
     }
 }
