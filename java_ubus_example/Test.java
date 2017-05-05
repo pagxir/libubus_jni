@@ -28,13 +28,19 @@ public class Test {
             }
 */
 
-            for (int i = 0; i < 10000; i ++) {
+            for (int i = 0; i < 10; i ++) {
                 UbusPoller poller = UbusPoller.getInstance();
                 String result = poller.ubusInvoke(args[0], args[1], args[2]);
                 if (result != null) {
                     System.out.println(result);
                 }
             }
+        }
+
+        try {
+            Thread.sleep(1000000);
+        } catch (InterruptedException e) {
+            System.out.println(e.toString());
         }
 
         return;

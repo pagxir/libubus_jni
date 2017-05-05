@@ -324,11 +324,19 @@ public class UbusPoller implements Runnable {
         }
     }
 
+    static final String json_str = "{\"name\": \"blog\"," + 
+        "\"method\": [" +
+            "{\"name\": \"post\", \"policy\": [{\"name\": \"data\", \"type\": 3}]}," +
+            "{\"name\": \"read\", \"policy\": [{\"name\": \"index\", \"type\": 3}]}" +
+        "] }";
+
     public void run() {
         int index;
         int[] pendingReturns = new int[100];
 
         UbusJNI.init();
+        UbusJNI.addObject("blog", json_str);
+
         for ( ; ; ) {
             synchronized (mInvokableQueue) {
                 while (!mInvokableQueue.isEmpty()) {
@@ -351,6 +359,7 @@ public class UbusPoller implements Runnable {
 
             UbusRequest req = new UbusRequest();
             while (req.pullRequest()) {
+                System.out.println("receive incoming request");
                 mRequestQueue.add(req);
                 mRequestQueue.notify();
                 req = new UbusRequest();

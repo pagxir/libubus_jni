@@ -420,7 +420,7 @@ ssize_t ubus_get_type_info(const char *type_json, struct ubus_object_type_info *
 
     blob_buf_init(&buf, BLOBMSG_TYPE_ARRAY);
     if (! blobmsg_add_json_from_string(&buf, type_json)) {
-        UBUS_WRAP_LOG("load json to blob buf failed\n");
+        UBUS_WRAP_LOG("load json to blob buf failed: %s\n", type_json);
         goto finalize;
     }
 
@@ -499,6 +499,7 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
     struct blob_attr *object_type_attr[ARRAY_SIZE(type_policy)];
 
     struct ubus_object_type_info myinfo = *info;
+    struct ubus_object_type *ret_object = NULL;
     myinfo.n_methods = 0;
     myinfo.n_policys = 0;
 
@@ -555,10 +556,11 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
         myinfo.method++;
         assert ((void *)myinfo.method < limit);
     }
+    ret_object = myinfo.type;
 
 finalize:
     blob_buf_free(&buf);
-    return NULL;
+    return ret_object;
 }
 
 static const char * wrap_alloc_string(char *buf, size_t offset, const char *name)
@@ -583,6 +585,7 @@ int ubus_wrap_add_object(const char *name, const char *type_json)
     object = &_ubus_objects[index];
 
     total_size = ubus_get_type_info(type_json, &info);
+    UBUS_WRAP_LOG("total_size is %d\n", total_size);
     assert (total_size > 0);
 
     base_buf = calloc(total_size + strlen(name) + 1, 1);
