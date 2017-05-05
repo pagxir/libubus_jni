@@ -19,8 +19,10 @@ int ubus_wrap_invoke(struct ubus_jni_context *upp, int index, const char *object
 int ubus_wrap_fetch_return(int returns[], int size);
 int ubus_wrap_release(struct ubus_jni_context *upp);
 
-int ubus_wrap_add_object(const char *name, void *upper, size_t len);
+int ubus_wrap_add_object(const char *name, const char *type_name, void *upper, size_t len);
 int ubus_wrap_remove_object(int object_id);
+
+struct ubus_object_type *ubus_parse_object_type(const char *type_name, const void *ptr, size_t len);
 
 #ifdef __cplusplus
 };

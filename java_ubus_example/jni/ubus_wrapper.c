@@ -363,12 +363,106 @@ static int _ubus_nobject = 0;
 static char _ubus_use_bitmap[MAX_OBJECTS];
 static struct ubus_object _ubus_objects[MAX_OBJECTS];
 
-static struct ubus_object_type *ubus_parse_object_type(const void *ptr, size_t len)
+static const struct blobmsg_policy type_policy[] = {
+    [0] = { .name = "method", .type = BLOBMSG_TYPE_ARRAY }
+};
+
+static const struct blobmsg_policy method_policy[] = {
+    [0] = { .name = "name", .type = BLOBMSG_TYPE_STRING },
+    [1] = { .name = "policy", .type = BLOBMSG_TYPE_ARRAY }
+};
+
+static const struct blobmsg_policy params_policy[] = {
+    [0] = { .name = "name", .type = BLOBMSG_TYPE_STRING },
+    [1] = { .name = "type", .type = BLOBMSG_TYPE_INT32 }
+};
+
+struct ubus_object_type *ubus_parse_object_type(const char *type_name, const void *ptr, size_t len)
 {
+    struct blob_buf buf = {'\0'};
+    struct blob_attr *object_type_attr = NULL;
+    struct blob_attr *method_item_attr = NULL;
+    struct blob_attr *param_item_attr = NULL;
+
+    struct blob_attr *method_attr[ARRAY_SIZE(method_policy)];
+    struct blob_attr *params_attr[ARRAY_SIZE(params_policy)];
+
+    size_t type_buf_len = 0;
+    char * type_buf_buf = 0;
+    size_t type_method_count = 0;
+    size_t type_params_count = 0;
+    size_t type_string_total = 0;
+
+    static const char obj_type_str[] = {
+        "{\"method\": ["
+            "{"
+                "\"name\": \"hello\","
+                "\"policy\": ["
+                    "{\"name\": \"one\", \"type\": 5},"
+                    "{\"name\": \"two\", \"type\": 4}"
+                "]"
+            "},"
+            "{"
+                "\"name\": \"byebye\","
+                "\"policy\": ["
+                    "{\"name\": \"one\", \"type\": 5},"
+                    "{\"name\": \"two\", \"type\": 4}"
+                "]"
+            "}"
+        "]}"
+    };
+
+    blob_buf_init(&buf, BLOBMSG_TYPE_ARRAY);
+    if (! blobmsg_add_json_from_string(&buf, obj_type_str)) {
+        UBUS_WRAP_LOG("load json to blob buf failed\n");
+        goto finalize;
+    }
+
+    if (blobmsg_parse(type_policy, ARRAY_SIZE(type_policy), &object_type_attr, blob_data(buf.head), blob_len(buf.head)) != 0) {
+        UBUS_WRAP_LOG("base parse failed\n");
+        goto finalize;
+    }
+
+    size_t type_data_len = blobmsg_len(object_type_attr);
+fill_data:
+    __blob_for_each_attr(method_item_attr, blobmsg_data(object_type_attr), type_data_len) {
+        if (blobmsg_parse(method_policy, ARRAY_SIZE(method_policy), method_attr, blobmsg_data(method_item_attr), blobmsg_len(method_item_attr)) != 0) {
+            UBUS_WRAP_LOG("parse failed\n");
+            goto finalize;
+        }
+
+        const char *tmpstr = blobmsg_get_string(method_attr[0]);
+        UBUS_WRAP_LOG("name is %s\n", tmpstr);
+        type_string_total += strlen(tmpstr);
+        type_string_total++;
+
+        size_t method_data_len = blobmsg_len(method_attr[1]);
+        __blob_for_each_attr(param_item_attr, blobmsg_data(method_attr[1]), method_data_len) {
+            if (blobmsg_parse(params_policy, ARRAY_SIZE(params_policy), params_attr, blobmsg_data(param_item_attr), blobmsg_len(param_item_attr)) != 0) {
+                UBUS_WRAP_LOG("parse failed\n");
+                goto finalize;
+            }
+
+            tmpstr = blobmsg_get_string(params_attr[0]);
+            UBUS_WRAP_LOG("arg_name is %s\n", tmpstr);
+            type_string_total += strlen(tmpstr);
+            type_string_total++;
+
+            UBUS_WRAP_LOG("arg_type is %d\n", blobmsg_get_u32(params_attr[1]));
+            type_params_count++;
+        }
+
+        type_method_count++;
+    }
+
+    UBUS_WRAP_LOG("parse success: %p %d method %d params %d string %d\n",
+            object_type_attr, type_data_len, type_method_count, type_params_count, type_string_total);
+finalize:
+    blob_buf_free(&buf);
     return NULL;
 }
 
-int ubus_wrap_add_object(const char *name, void *upper, size_t len)
+int ubus_wrap_add_object(const char *name, const char *type_name, void *upper, size_t len)
 {
     int ret;
     struct ubus_object *object;
@@ -379,7 +473,7 @@ int ubus_wrap_add_object(const char *name, void *upper, size_t len)
     assert(_ubus_nobject + 1 < MAX_OBJECTS);
     object = &_ubus_objects[index];
 
-    object->type = ubus_parse_object_type(upper, len);
+    object->type = ubus_parse_object_type(type_name, upper, len);
     assert(object->type != NULL);
 
     object->name = strdup(name);
@@ -401,7 +495,7 @@ int ubus_wrap_remove_object(int object_id)
     assert(_ubus_use_bitmap[object_id] == 0x1);
 
     object = &_ubus_objects[object_id];
-    free(object->name);
+    free((void *)object->name);
     object->name = NULL;
     free(object->type);
     memset(object, 0, sizeof(*object));
