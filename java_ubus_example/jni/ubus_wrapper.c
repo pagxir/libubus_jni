@@ -364,7 +364,8 @@ static char _ubus_use_bitmap[MAX_OBJECTS];
 static struct ubus_object _ubus_objects[MAX_OBJECTS];
 
 static const struct blobmsg_policy type_policy[] = {
-    [0] = { .name = "method", .type = BLOBMSG_TYPE_ARRAY }
+    [0] = { .name = "name", .type = BLOBMSG_TYPE_STRING },
+    [1] = { .name = "method", .type = BLOBMSG_TYPE_ARRAY }
 };
 
 static const struct blobmsg_policy method_policy[] = {
@@ -390,7 +391,7 @@ struct ubus_object_type_info {
 };
 
 static ssize_t ubus_get_type_info(const char *type_json, struct ubus_object_type_info *info);
-static struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ubus_object_type_info *type_info);
+static struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ubus_object_type_info *type_info, void *limit);
 
 int ubus_wrap_check_object_type(const char *type_json)
 {
@@ -405,15 +406,12 @@ ssize_t ubus_get_type_info(const char *type_json, struct ubus_object_type_info *
 {
     ssize_t retval = -1;
     struct blob_buf buf = {'\0'};
-    struct blob_attr *object_type_attr = NULL;
     struct blob_attr *method_item_attr = NULL;
     struct blob_attr *param_item_attr = NULL;
 
+    struct blob_attr *object_type_attr[ARRAY_SIZE(type_policy)];
     struct blob_attr *method_attr[ARRAY_SIZE(method_policy)];
     struct blob_attr *params_attr[ARRAY_SIZE(params_policy)];
-
-    size_t type_buf_len = 0;
-    char * type_buf_buf = 0;
 
     info->n_methods = 0;
     info->n_policys = 0;
@@ -426,19 +424,24 @@ ssize_t ubus_get_type_info(const char *type_json, struct ubus_object_type_info *
         goto finalize;
     }
 
-    if (blobmsg_parse(type_policy, ARRAY_SIZE(type_policy), &object_type_attr, blob_data(buf.head), blob_len(buf.head)) != 0) {
+    if (blobmsg_parse(type_policy, ARRAY_SIZE(type_policy), object_type_attr, blob_data(buf.head), blob_len(buf.head)) != 0) {
         UBUS_WRAP_LOG("base parse failed\n");
         goto finalize;
     }
 
-    size_t type_data_len = blobmsg_len(object_type_attr);
-    __blob_for_each_attr(method_item_attr, blobmsg_data(object_type_attr), type_data_len) {
+    const char *tmpstr = blobmsg_get_string(object_type_attr[0]);
+    UBUS_WRAP_LOG("type name is %s\n", tmpstr);
+    info->n_strbyte += strlen(tmpstr);
+    info->n_strings++;
+
+    size_t type_data_len = blobmsg_len(object_type_attr[1]);
+    __blob_for_each_attr(method_item_attr, blobmsg_data(object_type_attr[1]), type_data_len) {
         if (blobmsg_parse(method_policy, ARRAY_SIZE(method_policy), method_attr, blobmsg_data(method_item_attr), blobmsg_len(method_item_attr)) != 0) {
             UBUS_WRAP_LOG("parse failed\n");
             goto finalize;
         }
 
-        const char *tmpstr = blobmsg_get_string(method_attr[0]);
+        tmpstr = blobmsg_get_string(method_attr[0]);
         UBUS_WRAP_LOG("name is %s\n", tmpstr);
         info->n_strbyte += strlen(tmpstr);
         info->n_strings++;
@@ -463,7 +466,7 @@ ssize_t ubus_get_type_info(const char *type_json, struct ubus_object_type_info *
     }
 
     UBUS_WRAP_LOG("parse success: %p %d method %d params %d string %d\n",
-            object_type_attr, type_data_len, info->n_methods, info->n_policys, info->n_strbyte);
+            object_type_attr[1], type_data_len, info->n_methods, info->n_policys, info->n_strbyte);
     retval = sizeof(struct ubus_object_type) + info->n_methods * sizeof(struct ubus_method) 
         + info->n_policys * sizeof(struct blobmsg_policy) + info->n_strings + info->n_strbyte;
 
@@ -472,22 +475,32 @@ finalize:
     return retval;
 }
 
+const char *wrap_string(struct ubus_object_type_info *info, void *limit, const char *str)
+{
+    size_t len = strlen(str);
+    const char * buf = info->strings;
 
-struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ubus_object_type_info *info)
+    assert (info->strings + len < (char *)limit);
+    memcpy(info->strings, str, len + 1);
+    info->strings += len;
+    info->strings++;
+
+    return buf;
+}
+
+struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ubus_object_type_info *info, void *limit)
 {
     struct blob_buf buf = {'\0'};
-    struct blob_attr *object_type_attr = NULL;
     struct blob_attr *method_item_attr = NULL;
     struct blob_attr *param_item_attr = NULL;
 
     struct blob_attr *method_attr[ARRAY_SIZE(method_policy)];
     struct blob_attr *params_attr[ARRAY_SIZE(params_policy)];
+    struct blob_attr *object_type_attr[ARRAY_SIZE(type_policy)];
 
-    size_t type_buf_len = 0;
-    char * type_buf_buf = 0;
-    size_t type_method_count = 0;
-    size_t type_params_count = 0;
-    size_t type_string_total = 0;
+    struct ubus_object_type_info myinfo = *info;
+    myinfo.n_methods = 0;
+    myinfo.n_policys = 0;
 
     blob_buf_init(&buf, BLOBMSG_TYPE_ARRAY);
     if (! blobmsg_add_json_from_string(&buf, type_json)) {
@@ -495,22 +508,30 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
         goto finalize;
     }
 
-    if (blobmsg_parse(type_policy, ARRAY_SIZE(type_policy), &object_type_attr, blob_data(buf.head), blob_len(buf.head)) != 0) {
+    if (blobmsg_parse(type_policy, ARRAY_SIZE(type_policy), object_type_attr, blob_data(buf.head), blob_len(buf.head)) != 0) {
         UBUS_WRAP_LOG("base parse failed\n");
         goto finalize;
     }
 
-    size_t type_data_len = blobmsg_len(object_type_attr);
-    __blob_for_each_attr(method_item_attr, blobmsg_data(object_type_attr), type_data_len) {
+    const char *tmpstr = blobmsg_get_string(object_type_attr[0]);
+    UBUS_WRAP_LOG("type name is %s\n", tmpstr);
+    myinfo.type->name = wrap_string(&myinfo, limit, tmpstr);
+    myinfo.type->methods = myinfo.method;
+    myinfo.type->n_methods = 0;
+
+    size_t type_data_len = blobmsg_len(object_type_attr[1]);
+    __blob_for_each_attr(method_item_attr, blobmsg_data(object_type_attr[1]), type_data_len) {
         if (blobmsg_parse(method_policy, ARRAY_SIZE(method_policy), method_attr, blobmsg_data(method_item_attr), blobmsg_len(method_item_attr)) != 0) {
             UBUS_WRAP_LOG("parse failed\n");
             goto finalize;
         }
 
-        const char *tmpstr = blobmsg_get_string(method_attr[0]);
+        tmpstr = blobmsg_get_string(method_attr[0]);
         UBUS_WRAP_LOG("name is %s\n", tmpstr);
-        type_string_total += strlen(tmpstr);
-        type_string_total++;
+        myinfo.method->name = wrap_string(&myinfo, limit, tmpstr);
+        myinfo.method->policy = myinfo.policy;
+        myinfo.method->n_policy = 0;
+        myinfo.method->handler  = dummy_defer_cb;
 
         size_t method_data_len = blobmsg_len(method_attr[1]);
         __blob_for_each_attr(param_item_attr, blobmsg_data(method_attr[1]), method_data_len) {
@@ -521,18 +542,17 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
 
             tmpstr = blobmsg_get_string(params_attr[0]);
             UBUS_WRAP_LOG("arg_name is %s\n", tmpstr);
-            type_string_total += strlen(tmpstr);
-            type_string_total++;
+            myinfo.policy->name = wrap_string(&myinfo, limit, tmpstr);
+            myinfo.policy->type = blobmsg_get_u32(params_attr[1]);
 
-            UBUS_WRAP_LOG("arg_type is %d\n", blobmsg_get_u32(params_attr[1]));
-            type_params_count++;
+            myinfo.method->n_policy++;
+            myinfo.method->policy++;
         }
 
-        type_method_count++;
+        myinfo.type->n_methods++;
+        myinfo.method++;
     }
 
-    UBUS_WRAP_LOG("parse success: %p %d method %d params %d string %d\n",
-            object_type_attr, type_data_len, type_method_count, type_params_count, type_string_total);
 finalize:
     blob_buf_free(&buf);
     return NULL;
@@ -568,7 +588,7 @@ int ubus_wrap_add_object(const char *name, const char *type_json)
     info.policy = (struct blobmsg_policy *)(info.method + info.n_methods);
     info.strings = (char *)(info.policy + info.n_policys);
 
-    object->type = ubus_parse_object_type(type_json, &info);
+    object->type = ubus_parse_object_type(type_json, &info, base_buf + total_size);
     assert(object->type != NULL);
 
     object->name = wrap_alloc_string(base_buf, total_size, name);
