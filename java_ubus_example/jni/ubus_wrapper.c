@@ -547,10 +547,13 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
 
             myinfo.method->n_policy++;
             myinfo.method->policy++;
+            myinfo.policy++;
+            assert ((void *)myinfo.policy < limit);
         }
 
         myinfo.type->n_methods++;
         myinfo.method++;
+        assert ((void *)myinfo.method < limit);
     }
 
 finalize:
