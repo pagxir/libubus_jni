@@ -600,7 +600,7 @@ int ubus_wrap_add_object(const char *name, const char *type_json)
     object->methods = object->type->methods;
     object->n_methods = object->type->n_methods;
 
-    UBUS_WRAP_LOG("methods %d %p %s\n", object->n_methods, main_ctx->bus_handle, object->name);
+    UBUS_WRAP_LOG("methods %d %p %s %d\n", object->n_methods, main_ctx->bus_handle, object->name, index);
     ret = ubus_add_object(main_ctx->bus_handle, object);
     assert(ret == 0);
 

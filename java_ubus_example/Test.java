@@ -47,11 +47,20 @@ public class Test {
         }
     }
 
+    static final String json_str = "{\"name\": \"blog\"," + 
+        "\"method\": [" +
+            "{\"name\": \"post\", \"policy\": [{\"name\": \"data\", \"type\": 3}]}," +
+            "{\"name\": \"read\", \"policy\": [{\"name\": \"index\", \"type\": 3}]}" +
+        "] }";
+
     public static void main(String[] args) {
         // Prints "Hello, World" to the terminal window.
         System.out.println("Hello, World");
 
         mParams = args;
+        int objectId = UbusPoller.getInstance().ubusAddObject("osgimgr", json_str);
+        System.out.println("object id is " + objectId);
+
         if (args.length >= 3) {
             for (int i = 0; i < 10; i ++) {
                 UbusPoller poller = UbusPoller.getInstance();
@@ -60,6 +69,11 @@ public class Test {
                     System.out.println(result);
                 }
             }
+        }
+
+        try {
+            Thread.sleep(10000);
+        } catch (Exception e) {
         }
 
         dumpTypeInfo(osgimgt.class);

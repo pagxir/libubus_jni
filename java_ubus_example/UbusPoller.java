@@ -259,8 +259,12 @@ class UbusInvoker extends UbusInvokable implements Runnable {
 class UbusAddObjectInvoker extends UbusInvoker {
     int objectIndex = -1;
 
+    @Override
     public void invokeNative() {
+        System.out.println("object name is " + this.object);
+        System.out.println("object type is " + this.params);
         objectIndex = UbusJNI.addObject(this.object, this.params);
+        System.out.println("object index is " + this.objectIndex);
         completed = true;
         notify();
     }
@@ -342,12 +346,6 @@ public class UbusPoller implements Runnable {
             }
         }
     }
-
-    static final String json_str = "{\"name\": \"blog\"," + 
-        "\"method\": [" +
-            "{\"name\": \"post\", \"policy\": [{\"name\": \"data\", \"type\": 3}]}," +
-            "{\"name\": \"read\", \"policy\": [{\"name\": \"index\", \"type\": 3}]}" +
-        "] }";
 
     public void run() {
         int index;
