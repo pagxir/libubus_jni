@@ -4,6 +4,25 @@
 
 int main(int argc, char *argv[])
 {
-    ubus_parse_object_type("test", "L", 1);
+    static const char obj_type_str[] = {
+        "{\"method\": ["
+            "{"
+                "\"name\": \"hello\","
+                "\"policy\": ["
+                    "{\"name\": \"one\", \"type\": 5},"
+                    "{\"name\": \"two\", \"type\": 4}"
+                "]"
+            "},"
+            "{"
+                "\"name\": \"byebye\","
+                "\"policy\": ["
+                    "{\"name\": \"one\", \"type\": 5},"
+                    "{\"name\": \"two\", \"type\": 4}"
+                "]"
+            "}"
+        "]}"
+    };
+
+    ubus_parse_object_type(obj_type_str);
     return 0;
 }

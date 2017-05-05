@@ -16,7 +16,7 @@ public class UbusJNI {
         return new byte[NATIVE_CONTEXT_LENGTH];
     }
 
-    static public native int addObject(String name, String type_name, byte[] typeInfo);
+    static public native int addObject(String name, String type_json);
     static public native void removeObject(int objectId);
 
     static {

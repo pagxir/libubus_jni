@@ -377,7 +377,7 @@ static const struct blobmsg_policy params_policy[] = {
     [1] = { .name = "type", .type = BLOBMSG_TYPE_INT32 }
 };
 
-struct ubus_object_type *ubus_parse_object_type(const char *type_name, const void *ptr, size_t len)
+struct ubus_object_type *ubus_parse_object_type(const char *type_json)
 {
     struct blob_buf buf = {'\0'};
     struct blob_attr *object_type_attr = NULL;
@@ -393,27 +393,8 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_name, const voi
     size_t type_params_count = 0;
     size_t type_string_total = 0;
 
-    static const char obj_type_str[] = {
-        "{\"method\": ["
-            "{"
-                "\"name\": \"hello\","
-                "\"policy\": ["
-                    "{\"name\": \"one\", \"type\": 5},"
-                    "{\"name\": \"two\", \"type\": 4}"
-                "]"
-            "},"
-            "{"
-                "\"name\": \"byebye\","
-                "\"policy\": ["
-                    "{\"name\": \"one\", \"type\": 5},"
-                    "{\"name\": \"two\", \"type\": 4}"
-                "]"
-            "}"
-        "]}"
-    };
-
     blob_buf_init(&buf, BLOBMSG_TYPE_ARRAY);
-    if (! blobmsg_add_json_from_string(&buf, obj_type_str)) {
+    if (! blobmsg_add_json_from_string(&buf, type_json)) {
         UBUS_WRAP_LOG("load json to blob buf failed\n");
         goto finalize;
     }
@@ -462,7 +443,7 @@ finalize:
     return NULL;
 }
 
-int ubus_wrap_add_object(const char *name, const char *type_name, void *upper, size_t len)
+int ubus_wrap_add_object(const char *name, const char *type_json)
 {
     int ret;
     struct ubus_object *object;
@@ -473,7 +454,7 @@ int ubus_wrap_add_object(const char *name, const char *type_name, void *upper, s
     assert(_ubus_nobject + 1 < MAX_OBJECTS);
     object = &_ubus_objects[index];
 
-    object->type = ubus_parse_object_type(type_name, upper, len);
+    object->type = ubus_parse_object_type(type_json);
     assert(object->type != NULL);
 
     object->name = strdup(name);
