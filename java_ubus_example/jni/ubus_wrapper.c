@@ -606,7 +606,7 @@ int ubus_wrap_add_object(const char *name, const char *type_json)
 
     _ubus_use_bitmap[index] = 0x1;
     _ubus_nobject++;
-    return -1;
+    return index;
 }
 
 int ubus_wrap_remove_object(int object_id)
