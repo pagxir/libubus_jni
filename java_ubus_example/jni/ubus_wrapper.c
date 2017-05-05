@@ -547,7 +547,6 @@ struct ubus_object_type *ubus_parse_object_type(const char *type_json, struct ub
             myinfo.policy->type = blobmsg_get_u32(params_attr[1]);
 
             myinfo.method->n_policy++;
-            myinfo.method->policy++;
             myinfo.policy++;
             assert ((void *)myinfo.policy < limit);
         }
@@ -601,6 +600,7 @@ int ubus_wrap_add_object(const char *name, const char *type_json)
     object->methods = object->type->methods;
     object->n_methods = object->type->n_methods;
 
+    UBUS_WRAP_LOG("methods %d %p %s\n", object->n_methods, main_ctx->bus_handle, object->name);
     ret = ubus_add_object(main_ctx->bus_handle, object);
     assert(ret == 0);
 
