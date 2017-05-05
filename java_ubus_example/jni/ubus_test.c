@@ -23,6 +23,6 @@ int main(int argc, char *argv[])
         "]}"
     };
 
-    ubus_parse_object_type(obj_type_str);
+    ubus_wrap_check_object_type(obj_type_str);
     return 0;
 }
