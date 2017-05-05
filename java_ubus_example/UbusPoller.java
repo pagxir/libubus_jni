@@ -46,6 +46,22 @@ class UbusBaseState implements UbusInvokableState {
     }
 }
 
+class UbusPendingRequestState extends UbusBaseState {
+    public UbusPendingRequestState(UbusInvoker invoker) {
+        super(invoker);
+    }
+
+    public void start() {
+        mInvoker.invokeStart();
+        return;
+    }
+
+    public void cancel() {
+        mInvoker.JNICancel();
+        return;
+    }
+}
+
 class UbusInitializeState extends UbusBaseState {
 
     public UbusInitializeState(UbusInvoker invoker) {
@@ -261,28 +277,51 @@ class UbusAddObjectInvoker extends UbusInvoker {
 
     @Override
     public void invokeNative() {
-        System.out.println("object name is " + this.object);
-        System.out.println("object type is " + this.params);
         objectIndex = UbusJNI.addObject(this.object, this.params);
-        System.out.println("object index is " + this.objectIndex);
         completed = true;
         notify();
     }
 }
 
-public class UbusPoller implements Runnable {
-    static class UbusRequest {
-        byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
+class UbusRequest extends UbusInvoker {
 
-        public boolean pullRequest() {
-            return UbusJNI.acceptRequest(native_context);
+    public boolean pullRequest() {
+        if (UbusJNI.acceptRequest(native_context)) {
+            invokable = new UbusPendingRequestState(this);
+            return true;
         }
+        return false;
+    }
 
-        public void relayRequest() {
-            UbusJNI.reply(native_context);
-            return;
+    @Override
+    public void invokeNative() {
+        UbusJNI.reply(native_context);
+        invokable = new UbusCompletedState(this);
+        return;
+    }
+
+    @Override
+    public void JNIAbort() {
+        UbusJNI.reply(native_context);
+        invokable = new UbusCompletedState(this);
+        return;
+    }
+
+    @Override
+    public void invokeStart() {
+        UbusPoller.getInstance().add(this);
+        invokable = new UbusQueuedState(this);
+        return;
+    }
+
+    public void relayRequest() {
+        synchronized(this) {
+            invokable.start();
         }
     }
+}
+
+public class UbusPoller implements Runnable {
 
     public String ubusInvoke(String object, String method, String params) {
         UbusInvoker invokable = new UbusInvoker();
