@@ -71,12 +71,11 @@ public class Test {
             }
         }
 
-        try {
-            Thread.sleep(10000);
-        } catch (Exception e) {
-        }
+        do {
+            UbusRequest req = UbusPoller.getInstance().acceptRequest();
+        }while (true);
 
-        dumpTypeInfo(osgimgt.class);
-        return;
+        // dumpTypeInfo(osgimgt.class);
+        // return;
     }
 };
