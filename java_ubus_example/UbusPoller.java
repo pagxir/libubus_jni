@@ -360,8 +360,10 @@ public class UbusPoller implements Runnable {
             UbusRequest req = new UbusRequest();
             while (req.pullRequest()) {
                 System.out.println("receive incoming request");
-                mRequestQueue.add(req);
-                mRequestQueue.notify();
+                synchronized(mRequestQueue) {
+                    mRequestQueue.add(req);
+                    mRequestQueue.notify();
+                }
                 req = new UbusRequest();
             }
         }
