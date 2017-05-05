@@ -325,7 +325,7 @@ static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
     struct ubus_incoming_context *dreq = NULL;
     assert(_accept_incoming < 100);
 
-    dreq = calloc(sizeof(*req) + len, 1);
+    dreq = calloc(sizeof(*dreq) + len, 1);
     if (dreq == NULL) {
         return UBUS_STATUS_UNKNOWN_ERROR;
     }
