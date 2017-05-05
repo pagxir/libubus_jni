@@ -1,3 +1,26 @@
+import java.lang.reflect.*;
+import java.lang.annotation.*;
+
+interface osgimgt {
+    void install(String Plugin_Name, String Version, String PluginDir, String JarName);
+    void installUpdate(String Plugin_Name, String Version, String PluginDir, String JarName, String RunMode);
+    void installQuery(String Plugin_Name, String Version);
+    void installCancel(String Plugin_Name, String Version);
+    void uninstall(String Plugin_Name, String Version);
+    void stop(String Plugin_Name, String Version);
+    void run(String Plugin_Name, String Version);
+    void restoreFactory(String Plugin_Name, String Version);
+    void GetPluginList();
+    void setPlugParam(String Plugin_Name, String Version, String Parameter);
+    void getStatus(String Plugin_Name, String Version);
+    void getPluginAttr(String Name);
+    void getBundleAttr(String Name);
+    void setAutoStart(String EUName, String NeedAutoStart);
+    void setRequestedState(String EUName, String RequestedState);
+    void setAPICap(String Name, String Cap);
+    void APICapChange(String Name);
+}
+
 public class Test {
 
     static String[] mParams = null;
@@ -14,20 +37,22 @@ public class Test {
         }
     };
 
+    static void dumpTypeInfo(Class klass) {
+        Method[] methods = klass.getDeclaredMethods();
+
+        System.out.println("Class Name is " + klass.getName());
+        for (int index = 0; index < methods.length; index++) {
+            System.out.println("Name is " + methods[index].getName());
+            Annotation[][] pas = methods[index].getParameterAnnotations();
+        }
+    }
+
     public static void main(String[] args) {
         // Prints "Hello, World" to the terminal window.
         System.out.println("Hello, World");
 
         mParams = args;
         if (args.length >= 3) {
-/*
-            for (int i = 0; i < 20; i++) {
-                Thread newThread = new Thread(mRunner);
-                // newThread.setDaemon(true);
-                newThread.start();
-            }
-*/
-
             for (int i = 0; i < 10; i ++) {
                 UbusPoller poller = UbusPoller.getInstance();
                 String result = poller.ubusInvoke(args[0], args[1], args[2]);
@@ -37,12 +62,7 @@ public class Test {
             }
         }
 
-        try {
-            Thread.sleep(1000000);
-        } catch (InterruptedException e) {
-            System.out.println(e.toString());
-        }
-
+        dumpTypeInfo(osgimgt.class);
         return;
     }
 };

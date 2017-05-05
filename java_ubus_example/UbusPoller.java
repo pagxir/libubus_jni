@@ -256,6 +256,16 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     }
 }
 
+class UbusAddObjectInvoker extends UbusInvoker {
+    int objectIndex = -1;
+
+    public void invokeNative() {
+        objectIndex = UbusJNI.addObject(this.object, this.params);
+        completed = true;
+        notify();
+    }
+}
+
 public class UbusPoller implements Runnable {
     static class UbusRequest {
         byte[] native_context = UbusJNI.createContext(); // allocate memory for native use
@@ -278,6 +288,15 @@ public class UbusPoller implements Runnable {
         invokable.completed = false;
         invokable.remoteInvoke();
         return invokable.result;
+    }
+
+    public int ubusAddObject(String name, String json_str) {
+        UbusAddObjectInvoker invokable = new UbusAddObjectInvoker();
+        invokable.object = name;
+        invokable.params = json_str;
+        invokable.completed = false;
+        invokable.remoteInvoke();
+        return invokable.objectIndex;
     }
 
     int mLastIndex = 0;
@@ -335,7 +354,6 @@ public class UbusPoller implements Runnable {
         int[] pendingReturns = new int[100];
 
         UbusJNI.init();
-        UbusJNI.addObject("blog", json_str);
 
         for ( ; ; ) {
             synchronized (mInvokableQueue) {
