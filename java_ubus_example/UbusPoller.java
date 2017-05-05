@@ -424,6 +424,23 @@ public class UbusPoller implements Runnable {
         }
     }
 
+    UbusRequest acceptRequest() {
+        synchronized(mRequestQueue) {
+            try {
+                if (!mRequestQueue.isEmpty())
+                    return mRequestQueue.remove();
+
+                while (mRequestQueue.isEmpty()) {
+                    mRequestQueue.wait();
+                }
+
+                return mRequestQueue.remove();
+            } catch (InterruptedException e) {
+                throw new RuntimeException("acceptRequest failure");
+            }
+        }
+    }
+
     private boolean mIsStarted = false;
 
     private void start() {
