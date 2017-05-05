@@ -73,6 +73,7 @@ public class Test {
 
         do {
             UbusRequest req = UbusPoller.getInstance().acceptRequest();
+            req.relayRequest();
         }while (true);
 
         // dumpTypeInfo(osgimgt.class);
