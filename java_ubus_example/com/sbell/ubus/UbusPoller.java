@@ -297,14 +297,14 @@ class UbusRequest extends UbusInvoker {
 
     @Override
     public void invokeNative() {
-        UbusJNI.reply(native_context);
+        UbusJNI.reply(native_context, this.result);
         invokable = new UbusCompletedState(this);
         return;
     }
 
     @Override
     public void JNIAbort() {
-        UbusJNI.reply(native_context);
+        UbusJNI.reply(native_context, "{}");
         invokable = new UbusCompletedState(this);
         return;
     }
@@ -316,8 +316,9 @@ class UbusRequest extends UbusInvoker {
         return;
     }
 
-    public void relayRequest() {
+    public void replyRequest(String jsonStr) {
         synchronized(this) {
+            this.result = (jsonStr == null? "{}": jsonStr);
             invokable.start();
         }
     }

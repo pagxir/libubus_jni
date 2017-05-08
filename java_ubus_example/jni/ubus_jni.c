@@ -42,12 +42,21 @@ static void jni_init(JNIEnv *env, jclass clazz)
     return;
 }
 
-static void jni_reply(JNIEnv *env, jclass clazz, jbyteArray context)
+static void jni_reply(JNIEnv *env, jclass clazz, jbyteArray context, jstring json)
 {
+    const char *buf_json = NULL;
     struct ubus_jni_context *upp = HOLD_CONTEXT(context);
     assert(upp != NULL);
+   
+    if (json != NULL) {
+        buf_json = (*env)->GetStringUTFChars(env, json, 0);
+        assert(buf_json != NULL);
+    }
 
-    ubus_wrap_reply(upp);
+    ubus_wrap_reply(upp, buf_json);
+    if (json != NULL) {
+        (*env)->ReleaseStringUTFChars(env, json, buf_json);
+    }
     FREE_CONTEXT(context, upp);
     return;
 }
@@ -170,7 +179,7 @@ static JNINativeMethod methods[] = {
     {"init", "()V", (void *)jni_init},
     {"abort", "()V", (void *)jni_abort},
     {"wakeup", "()V", (void *)jni_wakeup},
-    {"reply", "([B)V", (void *)jni_reply},
+    {"reply", "([BLjava/lang/String;)V", (void *)jni_reply},
     {"acceptRequest", "([B)Z", (void *)jni_accept_request},
 
     {"release", "([B)V", (void *)jni_release},

@@ -73,9 +73,11 @@ public class Test {
             }
         }
 
+        final String jsonStr = "{ \"XXXBUSRET\": 0, \"Plugin\": [ { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.huawei.smarthome.kernel\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 } ] }";
+
         do {
             UbusRequest req = UbusPoller.getInstance().acceptRequest();
-            req.relayRequest();
+            req.replyRequest(jsonStr);
         } while (true);
 
         // dumpTypeInfo(osgimgt.class);

@@ -13,7 +13,7 @@ int ubus_wrap_init();
 int ubus_wrap_wakeup();
 
 int ubus_wrap_accept_request(struct ubus_jni_context *upp);
-int ubus_wrap_reply(struct ubus_jni_context *upp);
+int ubus_wrap_reply(struct ubus_jni_context *upp, const char *json);
 
 int ubus_wrap_invoke(struct ubus_jni_context *upp, int index, const char *object, const char *method, const char *params);
 int ubus_wrap_fetch_return(int returns[], int size);

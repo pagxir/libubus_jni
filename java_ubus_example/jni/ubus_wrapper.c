@@ -299,19 +299,26 @@ int ubus_wrap_accept_request(struct ubus_jni_context *upp)
     return 0;
 }
 
-int ubus_wrap_reply(struct ubus_jni_context *upp)
+int ubus_wrap_reply(struct ubus_jni_context *upp, const char *json)
 {
+    struct blob_buf b = {};
     struct ubus_incoming_context *incoming;
     struct ubus_wrap_main_context *ctx = &_ubus_wrap_main;
 
     incoming = upp->req;
     assert(incoming != NULL);
-#if 0
-    blob_buf_init(&b, 0);
-    blobmsg_add_string(&b, "message", req->data);
-    ubus_send_reply(ctx, &req->req, b.head);
-#endif
+
+    if (json != NULL) {
+        blob_buf_init(&b, 0);
+        blobmsg_add_json_from_string(&b, json);
+        ubus_send_reply(ctx->bus_handle, &incoming->req, b.head);
+        blob_buf_free(&b);
+    }
+
     ubus_complete_deferred_request(ctx->bus_handle, &incoming->req, 0);
+    free(incoming);
+    upp->req = NULL;
+
     _accept_incoming--;
     return 0;
 }
