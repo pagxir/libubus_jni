@@ -5,6 +5,8 @@ public class UbusJNI {
     static public native void abort();
     static public native void wakeup();
     static public native byte[] getResult(byte[] native_context);
+    static public native String getRequestJson(byte[] native_context);
+
     static public native void reply(byte[] native_context, String result);
     static public native boolean acceptRequest(byte[] native_context);
 

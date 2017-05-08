@@ -271,8 +271,7 @@ struct ubus_incoming_context {
     struct list_head entry;
     struct ubus_request_data req;
 
-    void *msg_data;
-    size_t msg_len;
+    size_t json_len;
     char dummy[1];
 };
 
@@ -323,28 +322,48 @@ int ubus_wrap_reply(struct ubus_jni_context *upp, const char *json)
     return 0;
 }
 
+const char * ubus_wrap_get_requst_json(struct ubus_jni_context *upp, size_t *plen)
+{
+    struct ubus_incoming_context *incoming;
+
+    incoming = upp->req;
+    assert(incoming != NULL);
+
+    if (plen != NULL)
+        *plen = incoming->json_len;
+
+    return incoming->dummy;
+}
+
 static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
         struct ubus_request_data *req, const char *method,
         struct blob_attr *msg)
 {
-    size_t len = blob_len(msg);
-    void   *data = blob_data(msg);
+    int oserr = 0;
+    size_t json_len = 0;
+    char *json_str = NULL;
     struct ubus_incoming_context *dreq = NULL;
     assert(_accept_incoming < 100);
 
-    dreq = calloc(sizeof(*dreq) + len, 1);
-    if (dreq == NULL) {
-        return UBUS_STATUS_UNKNOWN_ERROR;
-    }
+    json_str = blobmsg_format_json(msg, true);
+    json_len = json_str? strlen(json_str): 0;
 
-    memcpy(dreq->dummy, data, len);
-    dreq->msg_data = dreq->dummy;
-    dreq->msg_len = len;
+    dreq = calloc(sizeof(*dreq) + json_len, 1);
+    if (dreq == NULL) {
+        oserr = UBUS_STATUS_UNKNOWN_ERROR;
+        goto free_and_return;
+    }
+    
+    memcpy(dreq->dummy, json_str, json_len + 1);
+    dreq->json_len = json_len;
     list_add_tail(&dreq->entry, &_ubus_incoming_reqs);
 
     ubus_defer_request(ctx, req, &dreq->req);
     uloop_end();
-    return 0;
+
+free_and_return:
+    free(json_str);
+    return oserr;
 }
 
 #if 0

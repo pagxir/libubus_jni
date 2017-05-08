@@ -51,6 +51,7 @@ public class Test {
 
     static final String json_str = "{\"name\": \"blog\"," + 
         "\"method\": [" +
+            "{\"name\": \"gc\", \"policy\": []}," +
             "{\"name\": \"post\", \"policy\": [{\"name\": \"data\", \"type\": 3}]}," +
             "{\"name\": \"read\", \"policy\": [{\"name\": \"index\", \"type\": 3}]}" +
         "] }";
@@ -77,6 +78,7 @@ public class Test {
 
         do {
             UbusRequest req = UbusPoller.getInstance().acceptRequest();
+            System.out.println(req.params);
             req.replyRequest(jsonStr);
         } while (true);
 

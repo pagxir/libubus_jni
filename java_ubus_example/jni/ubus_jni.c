@@ -118,6 +118,17 @@ static jint jni_fetch_return(JNIEnv *env, jclass clazz, jintArray results, jint 
     return count;
 }
 
+static jstring jni_get_requst_json(JNIEnv *env, jclass clazz, jbyteArray context)
+{
+    size_t len;
+    jbyteArray result = NULL;
+    struct ubus_jni_context *upp = HOLD_CONTEXT(context);
+    const char * retval = ubus_wrap_get_requst_json(upp, &len);
+
+    FREE_CONTEXT(context, upp);
+    return (*env)->NewStringUTF(env, retval);
+}
+
 static jbyteArray jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
 {
     size_t len;
@@ -187,6 +198,7 @@ static JNINativeMethod methods[] = {
     {"fetchReturn", "([II)I", (void *)jni_fetch_return},
 
     {"getResult", "([B)[B", jni_get_result},
+    {"getRequestJson", "([B)Ljava/lang/String;", jni_get_requst_json},
     {"getNativeContextSize", "()I", (void *)jni_get_context_size},
 
     {"addObject", "(Ljava/lang/String;Ljava/lang/String;)I", (void *)jni_add_object},
