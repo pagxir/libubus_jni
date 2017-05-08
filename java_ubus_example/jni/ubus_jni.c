@@ -10,6 +10,7 @@
 #define JNI_LOG(fmt, args...) fprintf(stderr, fmt, ##args)
 
 static const char *className = "com/sbell/ubus/UbusJNI";
+static const char *filesClassName = "com/sbell/ubus/Files";
 
 #if 0
 /*
@@ -183,6 +184,28 @@ static JNINativeMethod methods[] = {
     {"removeObject", "(I)V", (void *)jni_remove_object},
 };
 
+static jint jni_create_symlink(JNIEnv *env, jclass clazz, jstring oldpath, jstring newpath)
+{
+    int oserr;
+    const char *buf_old_path, *buf_new_path;
+    buf_old_path = (*env)->GetStringUTFChars(env, oldpath, 0);
+    assert(buf_old_path != NULL);
+
+    buf_new_path = (*env)->GetStringUTFChars(env, newpath, 0);
+    assert(buf_new_path != NULL);
+
+    oserr = symlink(oldpath, newpath);
+
+    (*env)->ReleaseStringUTFChars(env, newpath, buf_new_path);
+    (*env)->ReleaseStringUTFChars(env, oldpath, buf_old_path);
+
+    return oserr;
+}
+
+static JNINativeMethod filesMethods[] = {
+    {"createSymbolLink", "(Ljava/lang/String;Ljava/lang/String;)I", (void *)jni_create_symlink},
+};
+
 jint JNI_OnLoad(JavaVM * vm, void * reserved)
 {
     jclass clazz;
@@ -205,6 +228,18 @@ jint JNI_OnLoad(JavaVM * vm, void * reserved)
 
     methodsLength = sizeof(methods) / sizeof(methods[0]);
     if ((*env)->RegisterNatives(env, clazz, methods, methodsLength) < 0) {
+        JNI_LOG("RegisterNatives failed for '%s'", className);
+        return JNI_ERR;
+    }
+
+    clazz = (*env)->FindClass(env, filesClassName);
+    if (clazz == NULL) {
+        JNI_LOG("Native registration unable to find class '%s'", className);
+        return JNI_ERR;
+    }
+
+    methodsLength = sizeof(filesMethods) / sizeof(filesMethods[0]);
+    if ((*env)->RegisterNatives(env, clazz, filesMethods, methodsLength) < 0) {
         JNI_LOG("RegisterNatives failed for '%s'", className);
         return JNI_ERR;
     }
