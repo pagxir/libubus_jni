@@ -1,3 +1,5 @@
+package com.sbell.ubus;
+
 public class UbusJNI {
     static public native void init();
     static public native void abort();

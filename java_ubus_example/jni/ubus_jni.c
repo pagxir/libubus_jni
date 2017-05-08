@@ -9,7 +9,7 @@
 
 #define JNI_LOG(fmt, args...) fprintf(stderr, fmt, ##args)
 
-static const char *className = "UbusJNI";
+static const char *className = "com/sbell/ubus/UbusJNI";
 
 #if 0
 /*
