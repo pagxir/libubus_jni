@@ -207,63 +207,61 @@ class UbusAddObjectInvoker extends UbusInvoker {
     }
 }
 
-class UbusRequest extends UbusInvoker {
-    public String params = null;
-    public String method = null;
-    byte[] mfeed = new byte[1024 * 8];
-    public String stat = "init";
-
-    public boolean pullRequest() {
-        if (UbusJNI.acceptRequest(native_context)) {
-            params = UbusJNI.getRequestJson(native_context);
-            method = UbusJNI.getRequestMethod(native_context);
-            invokable = new UbusPendingRequestState();
-            stat = "pending";
-            return true;
-        }
-        stat = "pending failure";
-        return false;
-    }
-
-    @Override
-    public void invokeNative() {
-        UbusJNI.reply(native_context, this.result);
-        invokable = new UbusCompletedState();
-        stat = "completed";
-        notify();
-        return;
-    }
-
-    @Override
-    public void JNIAbort() {
-        UbusJNI.reply(native_context, "{}");
-        invokable = new UbusCompletedState();
-        stat = "abortcompleted";
-        return;
-    }
-
-    @Override
-    public void invokeStart() {
-        UbusPoller.getInstance().add(this);
-        invokable = new UbusQueuedState();
-        stat = "queued";
-        return;
-    }
-
-    public void replyRequest(String jsonStr) {
-        synchronized(this) {
-            this.result = (jsonStr == null? "{}": jsonStr);
-            invokable.start(this);
-        }
-    }
-
-    protected void finalize() {
-        // System.out.println("UbusRequest finalize " + stat + " " + this.hashCode());
-        // invokable.cancel(this);
-    }
-}
-
 public class UbusPoller implements Runnable {
+    public static class UbusRequest extends UbusInvoker {
+        public String params = null;
+        public String method = null;
+        public String stat = "init";
+
+        public boolean pullRequest() {
+            if (UbusJNI.acceptRequest(native_context)) {
+                params = UbusJNI.getRequestJson(native_context);
+                method = UbusJNI.getRequestMethod(native_context);
+                invokable = new UbusPendingRequestState();
+                stat = "pending";
+                return true;
+            }
+            stat = "pending failure";
+            return false;
+        }
+
+        @Override
+            public void invokeNative() {
+                UbusJNI.reply(native_context, this.result);
+                invokable = new UbusCompletedState();
+                stat = "completed";
+                notify();
+                return;
+            }
+
+        @Override
+            public void JNIAbort() {
+                UbusJNI.reply(native_context, "{}");
+                invokable = new UbusCompletedState();
+                stat = "abortcompleted";
+                return;
+            }
+
+        @Override
+            public void invokeStart() {
+                UbusPoller.getInstance().add(this);
+                invokable = new UbusQueuedState();
+                stat = "queued";
+                return;
+            }
+
+        public void replyRequest(String jsonStr) {
+            synchronized(this) {
+                this.result = (jsonStr == null? "{}": jsonStr);
+                invokable.start(this);
+            }
+        }
+
+        protected void finalize() {
+            // System.out.println("UbusRequest finalize " + stat + " " + this.hashCode());
+            // invokable.cancel(this);
+        }
+    }
 
     public String ubusInvoke(String object, String method, String params) {
         UbusInvoker invokable = new UbusInvoker();
@@ -362,10 +360,6 @@ public class UbusPoller implements Runnable {
                 }
             }
 
-            for (int i = 0; i < 1000; i++) {
-                req = new UbusRequest();
-            }
-
             while (req.pullRequest()) {
                 synchronized(mRequestQueue) {
                     mRequestQueue.add(req);
@@ -376,7 +370,7 @@ public class UbusPoller implements Runnable {
         }
     }
 
-    UbusRequest acceptRequest() {
+    public UbusRequest acceptRequest() {
         synchronized(mRequestQueue) {
             try {
                 if (!mRequestQueue.isEmpty())
