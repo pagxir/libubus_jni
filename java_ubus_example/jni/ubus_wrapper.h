@@ -14,6 +14,7 @@ int ubus_wrap_wakeup();
 
 int ubus_wrap_accept_request(struct ubus_jni_context *upp);
 int ubus_wrap_reply(struct ubus_jni_context *upp, const char *json);
+const char * ubus_wrap_get_requst_method(struct ubus_jni_context *upp);
 const char * ubus_wrap_get_requst_json(struct ubus_jni_context *upp, size_t *len);
 
 int ubus_wrap_invoke(struct ubus_jni_context *upp, int index, const char *object, const char *method, const char *params);

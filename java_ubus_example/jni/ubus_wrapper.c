@@ -37,17 +37,20 @@ struct ubus_wrap_context {
     int flags;
 };
 
+static int _total_free = 0;
+static int _total_alloc = 0;
+
 static inline struct ubus_wrap_context *wrap_context(struct ubus_jni_context *ctx)
 {
     if (ctx->wrap == NULL) {
         struct ubus_wrap_context c;
         ctx->wrap = calloc(sizeof(c), 1);
         assert(ctx->wrap != NULL);
+        _total_alloc++;
     }
 
     return ctx->wrap;
 }
-
 
 LIST_HEAD(_ubus_return_reqs);
 
@@ -147,6 +150,7 @@ static void recv_cb_json_out(struct ubus_request *req, int type, struct blob_att
     struct ubus_wrap_context *upp = req->priv;
 
     upp->result = blobmsg_format_json(msg, true);
+    _total_alloc++;
     return;
 }
 
@@ -253,6 +257,7 @@ int ubus_wrap_release(struct ubus_jni_context *_upp)
         if (upp->result != NULL) {
             free(upp->result);
             upp->result = NULL;
+            _total_free++;
         }
 
         if (upp->flags & FLAG_RET_PENDING) {
@@ -261,6 +266,7 @@ int ubus_wrap_release(struct ubus_jni_context *_upp)
         }
 
         _upp->wrap = NULL;
+        _total_free++;
         free(upp);
     }
 
@@ -270,6 +276,9 @@ int ubus_wrap_release(struct ubus_jni_context *_upp)
 struct ubus_incoming_context {
     struct list_head entry;
     struct ubus_request_data req;
+
+    struct ubus_object *object;
+    const char *method;
 
     size_t json_len;
     char dummy[1];
@@ -319,7 +328,17 @@ int ubus_wrap_reply(struct ubus_jni_context *upp, const char *json)
     upp->req = NULL;
 
     _accept_incoming--;
+    _total_free++;
     return 0;
+}
+
+const char * ubus_wrap_get_requst_method(struct ubus_jni_context *upp)
+{
+    struct ubus_incoming_context *incoming;
+
+    incoming = upp->req;
+    assert(incoming != NULL);
+    return incoming->method;
 }
 
 const char * ubus_wrap_get_requst_json(struct ubus_jni_context *upp, size_t *plen)
@@ -335,34 +354,64 @@ const char * ubus_wrap_get_requst_json(struct ubus_jni_context *upp, size_t *ple
     return incoming->dummy;
 }
 
+#define MAX_OBJECTS 100
+static int _ubus_nobject = 0;
+static char _ubus_use_bitmap[MAX_OBJECTS];
+static struct ubus_object _ubus_objects[MAX_OBJECTS];
+
 static int dummy_defer_cb(struct ubus_context *ctx, struct ubus_object *obj,
         struct ubus_request_data *req, const char *method,
         struct blob_attr *msg)
 {
     int oserr = 0;
+    int index = 0;
     size_t json_len = 0;
     char *json_str = NULL;
     struct ubus_incoming_context *dreq = NULL;
-    assert(_accept_incoming < 100);
+    const struct ubus_method *cur_method = NULL;
+    const struct ubus_method *obj_method = NULL;
 
+    assert(_accept_incoming < 100);
     json_str = blobmsg_format_json(msg, true);
+    _total_alloc++;
     json_len = json_str? strlen(json_str): 0;
+    assert (obj >= _ubus_objects && obj <= _ubus_objects + ARRAY_SIZE(_ubus_objects));
+
+    for (obj_method = obj->methods, index = 0; index < obj->n_methods; index++) {
+        if (strcmp(obj_method[index].name, method) == 0) {
+            cur_method = obj_method + index;
+            break;
+        }
+    }
+
+    if (cur_method == NULL) {
+        UBUS_WRAP_LOG("unkown object method: %s\n", method);
+        oserr = UBUS_STATUS_UNKNOWN_ERROR;
+        goto cleanup;
+    }
+
+    UBUS_WRAP_LOG("memory alloc/free %d/%d\n", _total_alloc, _total_free);
 
     dreq = calloc(sizeof(*dreq) + json_len, 1);
     if (dreq == NULL) {
+        UBUS_WRAP_LOG("object outf of memory: %s\n", method);
         oserr = UBUS_STATUS_UNKNOWN_ERROR;
-        goto free_and_return;
+        goto cleanup;
     }
     
+    _total_alloc++;
+    dreq->method = cur_method->name;
     memcpy(dreq->dummy, json_str, json_len + 1);
     dreq->json_len = json_len;
+
     list_add_tail(&dreq->entry, &_ubus_incoming_reqs);
 
     ubus_defer_request(ctx, req, &dreq->req);
     uloop_end();
 
-free_and_return:
+cleanup:
     free(json_str);
+    _total_free++;
     return oserr;
 }
 
@@ -383,11 +432,6 @@ static struct ubus_object test_object = {
     .n_methods = ARRAY_SIZE(test_methods),
 };
 #endif
-
-#define MAX_OBJECTS 100
-static int _ubus_nobject = 0;
-static char _ubus_use_bitmap[MAX_OBJECTS];
-static struct ubus_object _ubus_objects[MAX_OBJECTS];
 
 static const struct blobmsg_policy type_policy[] = {
     [0] = { .name = "name", .type = BLOBMSG_TYPE_STRING },

@@ -78,7 +78,8 @@ public class Test {
 
         do {
             UbusRequest req = UbusPoller.getInstance().acceptRequest();
-            System.out.println(req.params);
+            System.out.println(req.method + " " + req.params);
+            if (req.method.equals("gc")) System.gc();
             req.replyRequest(jsonStr);
         } while (true);
 

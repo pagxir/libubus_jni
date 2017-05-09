@@ -268,7 +268,6 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     }
 
     protected void finalize() {
-        System.out.println("finalize");
         synchronized(this) {
             invokable.cancel();
         }
@@ -288,10 +287,12 @@ class UbusAddObjectInvoker extends UbusInvoker {
 
 class UbusRequest extends UbusInvoker {
     public String params = null;
+    public String method = null;
 
     public boolean pullRequest() {
         if (UbusJNI.acceptRequest(native_context)) {
             params = UbusJNI.getRequestJson(native_context);
+            method = UbusJNI.getRequestMethod(native_context);
             invokable = new UbusPendingRequestState(this);
             return true;
         }
