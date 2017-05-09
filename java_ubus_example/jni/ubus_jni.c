@@ -143,20 +143,8 @@ static jbyteArray jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
     jbyteArray result = NULL;
     struct ubus_jni_context *upp = HOLD_CONTEXT(context);
     const char * retval = ubus_wrap_get_result(upp);
-
-    if (retval != NULL) {
-        len = strlen(retval);
-        result = (*env)->NewByteArray(env, len);
-        if (result == NULL) {
-            goto failure; 
-        }
-
-        (*env)->SetByteArrayRegion(env, result, 0, len, retval);
-    }
-
-failure:
     FREE_CONTEXT(context, upp);
-    return result;
+    return retval == NULL? NULL: (*env)->NewStringUTF(env, retval);
 }
 
 static jint jni_get_context_size(JNIEnv *env, jclass clazz)
@@ -164,8 +152,13 @@ static jint jni_get_context_size(JNIEnv *env, jclass clazz)
     return ubus_wrap_get_context_size();
 }
 
+
+extern int _total_free;
+extern int _total_alloc;
+
 static void jni_abort(JNIEnv *env, jclass clazz)
 {
+    fprintf(stderr, "memory: alloc/free %d/%d\n", _total_alloc, _total_free);
     abort();
     return;
 }
@@ -205,7 +198,7 @@ static JNINativeMethod methods[] = {
     {"invoke", "(I[BLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", (void *)jni_invoke},
     {"fetchReturn", "([II)I", (void *)jni_fetch_return},
 
-    {"getResult", "([B)[B", jni_get_result},
+    {"getResult", "([B)Ljava/lang/String;", jni_get_result},
     {"getRequestJson", "([B)Ljava/lang/String;", jni_get_requst_json},
     {"getRequestMethod", "([B)Ljava/lang/String;", jni_get_requst_method},
     {"getNativeContextSize", "()I", (void *)jni_get_context_size},

@@ -4,7 +4,7 @@ public class UbusJNI {
     static public native void init();
     static public native void abort();
     static public native void wakeup();
-    static public native byte[] getResult(byte[] native_context);
+    static public native String getResult(byte[] native_context);
     static public native String getRequestJson(byte[] native_context);
     static public native String getRequestMethod(byte[] native_context);
 

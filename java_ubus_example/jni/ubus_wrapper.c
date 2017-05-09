@@ -37,8 +37,8 @@ struct ubus_wrap_context {
     int flags;
 };
 
-static int _total_free = 0;
-static int _total_alloc = 0;
+int _total_free = 0;
+int _total_alloc = 0;
 
 static inline struct ubus_wrap_context *wrap_context(struct ubus_jni_context *ctx)
 {
