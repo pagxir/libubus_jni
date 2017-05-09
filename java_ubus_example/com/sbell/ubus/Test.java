@@ -79,7 +79,12 @@ public class Test {
         do {
             UbusRequest req = UbusPoller.getInstance().acceptRequest();
             System.out.println(req.method + " " + req.params);
-            if (req.method.equals("gc")) System.gc();
+            if (req.method.equals("gc")) { 
+                System.gc();
+                System.out.println("JVM MAX MEMORY: " + Runtime.getRuntime().maxMemory()/1024/1024+"M");
+                System.out.println("JVM IS USING MEMORY:" + Runtime.getRuntime().totalMemory()/1024/1024+"M");
+                System.out.println("JVM IS FREE MEMORY:" + Runtime.getRuntime().freeMemory()/1024/1024+"M");
+            }
             req.replyRequest(jsonStr);
         } while (true);
 

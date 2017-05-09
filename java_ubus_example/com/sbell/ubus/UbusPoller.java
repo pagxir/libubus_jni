@@ -288,14 +288,18 @@ class UbusAddObjectInvoker extends UbusInvoker {
 class UbusRequest extends UbusInvoker {
     public String params = null;
     public String method = null;
+    byte[] mfeed = new byte[1024];
+    public String stat = "init";
 
     public boolean pullRequest() {
         if (UbusJNI.acceptRequest(native_context)) {
             params = UbusJNI.getRequestJson(native_context);
             method = UbusJNI.getRequestMethod(native_context);
             invokable = new UbusPendingRequestState(this);
+            stat = "pending";
             return true;
         }
+        stat = "pending failure";
         return false;
     }
 
@@ -303,6 +307,7 @@ class UbusRequest extends UbusInvoker {
     public void invokeNative() {
         UbusJNI.reply(native_context, this.result);
         invokable = new UbusCompletedState(this);
+        stat = "completed";
         completed = true;
         notify();
         return;
@@ -312,6 +317,7 @@ class UbusRequest extends UbusInvoker {
     public void JNIAbort() {
         UbusJNI.reply(native_context, "{}");
         invokable = new UbusCompletedState(this);
+        stat = "abortcompleted";
         return;
     }
 
@@ -319,6 +325,7 @@ class UbusRequest extends UbusInvoker {
     public void invokeStart() {
         UbusPoller.getInstance().add(this);
         invokable = new UbusQueuedState(this);
+        stat = "queued";
         return;
     }
 
@@ -326,6 +333,13 @@ class UbusRequest extends UbusInvoker {
         synchronized(this) {
             this.result = (jsonStr == null? "{}": jsonStr);
             invokable.start();
+        }
+    }
+
+    protected void finalize() {
+        // System.out.println("UbusRequest finalize " + stat + " " + this.hashCode());
+        synchronized(this) {
+            invokable.cancel();
         }
     }
 }
@@ -388,6 +402,7 @@ public class UbusPoller implements Runnable {
     public void add(UbusInvokable invokable) {
         synchronized(mInvokableQueue) {
             if (!invokable.mQueued) {
+                System.out.println("add invokable " + invokable.hashCode());
                 invokable.mQueued = true;
                 mInvokableQueue.add(invokable);
                 UbusJNI.wakeup();
@@ -396,15 +411,26 @@ public class UbusPoller implements Runnable {
     }
 
     public void run() {
+        try {
+            loop();
+        } catch (OutOfMemoryError e) {
+            System.out.println("memory " + e.toString());
+            UbusJNI.abort();
+        }
+    }
+
+    public void loop() {
         int index;
         int[] pendingReturns = new int[100];
 
         UbusJNI.init();
 
+        UbusRequest req = new UbusRequest();
         for ( ; ; ) {
             synchronized (mInvokableQueue) {
                 while (!mInvokableQueue.isEmpty()) {
                     UbusInvokable invokable = mInvokableQueue.remove();
+                    System.out.println("remote invokable " + invokable.hashCode());
                     invokable.mQueued = false;
                     invokable.run();
                 }
@@ -421,9 +447,11 @@ public class UbusPoller implements Runnable {
                 }
             }
 
-            UbusRequest req = new UbusRequest();
+            for (int i = 0; i < 1000; i++) {
+                req = new UbusRequest();
+            }
+
             while (req.pullRequest()) {
-                System.out.println("receive incoming request");
                 synchronized(mRequestQueue) {
                     mRequestQueue.add(req);
                     mRequestQueue.notify();

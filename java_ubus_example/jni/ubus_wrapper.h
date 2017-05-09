@@ -30,6 +30,7 @@ int ubus_wrap_check_object_type(const char *type_json);
 };
 #endif
 
-#define UBUS_WRAP_LOG(fmt, args...) fprintf(stderr, fmt, ##args)
+// #define UBUS_WRAP_LOG(fmt, args...) fprintf(stderr, fmt, ##args)
+#define UBUS_WRAP_LOG(fmt, args...) 
 
 #endif
