@@ -7,10 +7,6 @@ class UbusInvokable {
     boolean mQueued = false;
     Runnable mRunnable = null;
 
-    public UbusInvokable(Runnable _runnable) {
-        mRunnable = _runnable;
-    }
-
     public void run() {
         mRunnable.run();
     }
@@ -108,12 +104,8 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     int index;
     byte[] native_context = UbusJNI.createContext();
 
-    public UbusInvoker() {
-        super(null);
-        mRunnable = this;
-    }
-
     public void run() {
+        mRunnable = null;
         synchronized(this) {
             invokable.run(this);
         }
@@ -132,6 +124,7 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     }
 
     public void invokeStart() {
+        mRunnable = this;
         UbusPoller.getInstance().add(this);
         invokable = new UbusQueuedState();
     }
@@ -142,6 +135,7 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     }
 
     public void JNICancel() {
+        mRunnable = this;
         UbusPoller.getInstance().add(this);
         invokable = new UbusCanceledState();
     }
@@ -190,10 +184,6 @@ class UbusInvoker extends UbusInvokable implements Runnable {
 
         return;
     }
-
-    protected void finalize() {
-        // invokable.cancel(this);
-    }
 }
 
 class UbusAddObjectInvoker extends UbusInvoker {
@@ -212,6 +202,7 @@ public class UbusPoller implements Runnable {
         public String params = null;
         public String method = null;
         public String stat = "init";
+        byte[] holdMem = new byte[819200];
 
         public boolean pullRequest() {
             if (UbusJNI.acceptRequest(native_context)) {
@@ -244,6 +235,7 @@ public class UbusPoller implements Runnable {
 
         @Override
             public void invokeStart() {
+                mRunnable = this;
                 UbusPoller.getInstance().add(this);
                 invokable = new UbusQueuedState();
                 stat = "queued";
@@ -255,11 +247,6 @@ public class UbusPoller implements Runnable {
                 this.result = (jsonStr == null? "{}": jsonStr);
                 invokable.start(this);
             }
-        }
-
-        protected void finalize() {
-            // System.out.println("UbusRequest finalize " + stat + " " + this.hashCode());
-            // invokable.cancel(this);
         }
     }
 
@@ -341,12 +328,18 @@ public class UbusPoller implements Runnable {
 
         UbusRequest req = new UbusRequest();
         for ( ; ; ) {
-            synchronized (mInvokableQueue) {
-                while (!mInvokableQueue.isEmpty()) {
-                    UbusInvokable invokable = mInvokableQueue.remove();
+            for ( ; ; ) {
+                UbusInvokable invokable = null;
+
+                synchronized (mInvokableQueue) {
+                    if (mInvokableQueue.isEmpty()) {
+                        break;
+                    }
+
+                    invokable = mInvokableQueue.remove();
                     invokable.mQueued = false;
-                    invokable.run();
                 }
+                invokable.run();
             }
 
             int count = UbusJNI.fetchReturn(pendingReturns, pendingReturns.length);

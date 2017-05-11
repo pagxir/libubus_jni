@@ -58,7 +58,10 @@ public class Test {
 
     public static void main(String[] args) {
         // Prints "Hello, World" to the terminal window.
-        System.out.println("Hello, World");
+        final String jsonStr = "{ \"Result\": 0, \"Plugin\": [ { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.huawei.smarthome.kernel\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 } ] }";
+
+        for (String str: args) 
+            System.out.println("Hello, World " + WrapUbusResult(str));
 
         mParams = args;
         int objectId = UbusPoller.getInstance().ubusAddObject("osgimgr", json_str);
@@ -74,8 +77,6 @@ public class Test {
             }
         }
 
-        final String jsonStr = "{ \"XXXBUSRET\": 0, \"Plugin\": [ { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.huawei.smarthome.kernel\", \"Version\": \"\", \"Run\": 1 }, { \"Plugin_Name\": \"com.chinatelecom.all.smartgatew\", \"Version\": \"\", \"Run\": 1 } ] }";
-
         do {
             UbusPoller.UbusRequest req = UbusPoller.getInstance().acceptRequest();
             System.out.println(req.method + " " + req.params);
@@ -85,10 +86,26 @@ public class Test {
                 System.out.println("JVM IS USING MEMORY:" + Runtime.getRuntime().totalMemory()/1024/1024+"M");
                 System.out.println("JVM IS FREE MEMORY:" + Runtime.getRuntime().freeMemory()/1024/1024+"M");
             }
-            req.replyRequest(jsonStr);
+            req.replyRequest(WrapUbusResult(jsonStr));
         } while (true);
 
         // dumpTypeInfo(osgimgt.class);
         // return;
+    }
+
+    static String WrapUbusResult(String origin) {
+        String newRetval = origin;
+
+        if (origin == null)
+            newRetval = "{\"XXXBUSRET\": -1}";
+        else if (origin.matches(".*\"Result\":.*"))
+            newRetval = origin.replaceFirst("\"Result\":", "\"XXXBUSRET\":");
+        else if (origin.matches(".*\\{[^\"]*\\}.*"))
+            newRetval = origin.replaceFirst("\\{", "{\"XXXBUSRET\": 0");
+        else
+            newRetval = origin.replaceFirst("\\{", "{\"XXXBUSRET\": 0,");
+
+        System.out.println("return " + newRetval);
+        return newRetval;
     }
 };

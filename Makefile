@@ -38,5 +38,7 @@ libubox: install
 	make -C $(TOP_DIR)/libubox DESTDIR=$(DESTDIR)
 
 ubus: install libubox
-	mkdir -p $(TOP_DIR)/staging_dir/target/root/usr/{lib,sbin,bin}
+	mkdir -p $(TOP_DIR)/staging_dir/target/root/usr/lib
+	mkdir -p $(TOP_DIR)/staging_dir/target/root/usr/bin
+	mkdir -p $(TOP_DIR)/staging_dir/target/root/usr/sbin
 	make -C $(TOP_DIR)/ubus DESTDIR=$(DESTDIR)
