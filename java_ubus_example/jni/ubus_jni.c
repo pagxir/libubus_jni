@@ -137,7 +137,7 @@ static jstring jni_get_requst_json(JNIEnv *env, jclass clazz, jbyteArray context
     return (*env)->NewStringUTF(env, retval);
 }
 
-static jbyteArray jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
+static jstring jni_get_result(JNIEnv *env, jclass clazz, jbyteArray context)
 {
     size_t len;
     jbyteArray result = NULL;

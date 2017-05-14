@@ -126,30 +126,28 @@ class UbusInvoker extends UbusInvokable implements Runnable {
     public void invokeStart() {
         mRunnable = this;
         UbusPoller.getInstance().add(this);
-        invokable = new UbusQueuedState();
+        setState(ubusQueuedState);
     }
 
     public void JavaCancel() {
         // UbusPoller.getInstance().add(this);
-        invokable = new UbusCompletedState();
+        setState(ubusCompletedState);
     }
 
     public void JNICancel() {
         mRunnable = this;
         UbusPoller.getInstance().add(this);
-        invokable = new UbusCanceledState();
+        setState(ubusCanceledState);
     }
 
     public void javaAbort() {
-        invokable = new UbusCompletedState();
-        notify();
+        setState(ubusCompletedState);
     }
 
     public void JNIAbort() {
         UbusJNI.release(native_context);
-        invokable = new UbusCompletedState();
         UbusPoller.getInstance().setInvokeSlot(index, null);
-        notify();
+        setState(ubusCompletedState);
     }
 
     public void invokeNative() {
@@ -158,15 +156,26 @@ class UbusInvoker extends UbusInvokable implements Runnable {
         if (_index != -1) {
             UbusJNI.invoke(_index, native_context, object, method, params);
             UbusPoller.getInstance().setInvokeSlot(_index, this);
-            invokable = new UbusPendingState();
             this.index = _index;
+            setState(ubusPendingState);
         } else {
-            invokable = new UbusCompletedState();
-            notify();
+            setState(ubusCompletedState);
         }
     }
 
-    UbusInvokableState invokable = new UbusInitializeState();
+    static final UbusInvokableState ubusQueuedState = new UbusQueuedState();
+    static final UbusInvokableState ubusPendingState = new UbusPendingState();
+    static final UbusInvokableState ubusCanceledState = new UbusCanceledState();
+    static final UbusInvokableState ubusCompletedState = new UbusCompletedState();
+    static final UbusInvokableState ubusInitializeState = new UbusInitializeState();
+
+    UbusInvokableState invokable = ubusInitializeState;
+    void setState(UbusInvokableState newState) {
+        synchronized(this) {
+            invokable = newState;
+            notify();
+        }
+    }
 
     void remoteInvoke() {
 
@@ -189,11 +198,10 @@ class UbusInvoker extends UbusInvokable implements Runnable {
 class UbusAddObjectInvoker extends UbusInvoker {
     int objectIndex = -1;
 
-    @Override
+    // @Override
     public void invokeNative() {
         objectIndex = UbusJNI.addObject(this.object, this.params);
-        invokable = new UbusCompletedState();
-        notify();
+        setState(ubusCompletedState);
     }
 }
 
@@ -201,46 +209,44 @@ public class UbusPoller implements Runnable {
     public static class UbusRequest extends UbusInvoker {
         public String params = null;
         public String method = null;
-        public String stat = "init";
-        byte[] holdMem = new byte[819200];
+        static final UbusPendingRequestState ubusPendingRequestState = new UbusPendingRequestState();
 
-        public boolean pullRequest() {
-            if (UbusJNI.acceptRequest(native_context)) {
-                params = UbusJNI.getRequestJson(native_context);
-                method = UbusJNI.getRequestMethod(native_context);
-                invokable = new UbusPendingRequestState();
-                stat = "pending";
-                return true;
-            }
-            stat = "pending failure";
-            return false;
+        public void init() {
+	    params = null;
+	    method = null;
+	    setState(ubusInitializeState);
         }
 
-        @Override
-            public void invokeNative() {
-                UbusJNI.reply(native_context, this.result);
-                invokable = new UbusCompletedState();
-                stat = "completed";
-                notify();
-                return;
-            }
+        public boolean pullRequest() {
+	    if (!UbusJNI.acceptRequest(native_context)) {
+		return false;
+	    }
+	    params = UbusJNI.getRequestJson(native_context);
+	    method = UbusJNI.getRequestMethod(native_context);
+	    setState(ubusPendingRequestState);
+	    return true;
+        }
 
-        @Override
-            public void JNIAbort() {
-                UbusJNI.reply(native_context, "{}");
-                invokable = new UbusCompletedState();
-                stat = "abortcompleted";
-                return;
-            }
+        public void invokeNative() {
+            UbusJNI.reply(native_context, this.result);
+            setState(ubusCompletedState);
+            return;
+        }
 
-        @Override
-            public void invokeStart() {
-                mRunnable = this;
-                UbusPoller.getInstance().add(this);
-                invokable = new UbusQueuedState();
-                stat = "queued";
-                return;
-            }
+        // @Override
+        public void JNIAbort() {
+            UbusJNI.reply(native_context, "{}");
+            setState(ubusCompletedState);
+            return;
+        }
+
+        // @Override
+        public void invokeStart() {
+            mRunnable = this;
+            UbusPoller.getInstance().add(this);
+            setState(ubusQueuedState);
+            return;
+        }
 
         public void replyRequest(String jsonStr) {
             synchronized(this) {
@@ -326,6 +332,7 @@ public class UbusPoller implements Runnable {
 
         UbusJNI.init();
 
+        int reqCount = 0;
         UbusRequest req = new UbusRequest();
         for ( ; ; ) {
             for ( ; ; ) {
@@ -358,7 +365,9 @@ public class UbusPoller implements Runnable {
                     mRequestQueue.add(req);
                     mRequestQueue.notify();
                 }
-                req = new UbusRequest();
+
+		req = new UbusRequest();
+		reqCount++;
             }
         }
     }
